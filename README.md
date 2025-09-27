@@ -44,7 +44,7 @@ O sistema consulta dados do DataSUS, calcula métricas epidemiológicas e incorp
 ```bash
 # Clonar o repositório
 git clone https://github.com/aryMello/desafio-de-genAI.git
-cd srag-automated-reports
+cd desafio-de-genAI
 
 # Criar ambiente virtual
 python -m venv venv
@@ -132,7 +132,7 @@ report = asyncio.run(generate_custom_report())
 ## Estrutura do Projeto
 
 ```
-desafio-de-genai/
+desafio-de-genAI/
 ├── src/                      # Código fonte
 │   ├── agents/               # Agentes de IA
 │   │   ├── orchestrator.py      # Orquestrador principal
