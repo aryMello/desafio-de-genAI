@@ -28,7 +28,7 @@ O sistema consulta dados do DataSUS, calcula métricas epidemiológicas e incorp
 
 ## Arquitetura
 
-[Arquitetura](./assets/Arquitetura.png)
+![Imagem](./assets/Arquitetura.png)
 
 ## Instalação e Configuração
 
