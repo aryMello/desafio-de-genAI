@@ -1,3 +1,14 @@
+"""
+Classe base para ferramentas do Sistema SRAG
+"""
+
+from abc import ABC, abstractmethod
+from datetime import datetime
+from typing import Dict, Any, Optional
+import uuid
+
+from ..utils.logger import get_logger
+
 class BaseTool(ABC):
     """
     Classe base para todas as ferramentas do sistema.
@@ -31,10 +42,7 @@ class BaseTool(ABC):
             'last_execution_time': None
         }
         
-        self.logger.info(f"Ferramenta {tool_name} inicializada", extra={
-            'tool_id': self.tool_id,
-            'created_at': self.created_at.isoformat()
-        })
+        self.logger.info(f"Ferramenta {tool_name} inicializada", tool_id=self.tool_id)
     
     def log_execution_start(self, operation: str, params: Dict[str, Any]) -> str:
         """
@@ -49,12 +57,10 @@ class BaseTool(ABC):
         """
         execution_id = str(uuid.uuid4())
         
-        self.logger.info("Execução iniciada", extra={
-            'execution_id': execution_id,
-            'operation': operation,
-            'params': params,
-            'tool_name': self.tool_name
-        })
+        self.logger.info("Execução iniciada",
+                        execution_id=execution_id,
+                        operation=operation,
+                        tool_name=self.tool_name)
         
         self.usage_count += 1
         self.last_used = datetime.now()
@@ -96,22 +102,14 @@ class BaseTool(ABC):
         self.execution_stats['last_execution_time'] = execution_time
         
         # Log estruturado
-        self.logger.info("Execução finalizada", extra={
-            'execution_id': execution_id,
-            'success': success,
-            'execution_time': execution_time,
-            'result_summary': result_summary,
-            'error': error,
-            'tool_name': self.tool_name
-        })
+        self.logger.info("Execução finalizada",
+                        execution_id=execution_id,
+                        success=success,
+                        execution_time=execution_time,
+                        error=error)
     
     def get_tool_stats(self) -> Dict[str, Any]:
-        """
-        Retorna estatísticas da ferramenta.
-        
-        Returns:
-            Dict com estatísticas de uso
-        """
+        """Retorna estatísticas da ferramenta."""
         success_rate = 0.0
         if self.execution_stats['total_executions'] > 0:
             success_rate = (

@@ -108,7 +108,7 @@ class DatabaseTool(BaseTool):
             
             for chunk in pd.read_csv(
                 self.data_path,
-                encoding='latin-1',
+                encoding='utf-8',
                 sep=';',
                 chunksize=chunk_size,
                 low_memory=False,
@@ -152,7 +152,7 @@ class DatabaseTool(BaseTool):
             # Ler apenas o header para verificar colunas
             sample = pd.read_csv(
                 self.data_path,
-                encoding='latin-1',
+                encoding='utf-8',  # <-- MUDOU AQUI
                 sep=';',
                 nrows=0
             )
@@ -170,7 +170,7 @@ class DatabaseTool(BaseTool):
         except Exception as e:
             logger.error(f"Erro ao verificar colunas: {e}")
             return None
-    
+        
     def _process_chunk(
         self, 
         chunk: pd.DataFrame, 
@@ -189,11 +189,11 @@ class DatabaseTool(BaseTool):
             DataFrame processado
         """
         try:
-            # Converter datas
+            # Converter datas - CORRIGIDO PARA FORMATO ISO
             if 'DT_NOTIFIC' in chunk.columns:
                 chunk['DT_NOTIFIC'] = pd.to_datetime(
                     chunk['DT_NOTIFIC'], 
-                    format='%d/%m/%Y', 
+                    format='%Y-%m-%d',  # <-- MUDOU AQUI
                     errors='coerce'
                 )
                 
@@ -531,7 +531,7 @@ class DatabaseTool(BaseTool):
                 try:
                     test_data = pd.read_csv(
                         self.data_path,
-                        encoding='latin-1',
+                        encoding='utf-8',
                         sep=';',
                         nrows=5
                     )

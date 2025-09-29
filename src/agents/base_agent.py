@@ -1,3 +1,14 @@
+"""
+Classe base para agentes do Sistema SRAG
+"""
+
+from abc import ABC, abstractmethod
+from datetime import datetime
+from typing import Dict, Any, Optional, List
+import uuid
+
+from ..utils.logger import get_logger
+
 class BaseAgent(ABC):
     """
     Classe base para todos os agentes do sistema.
@@ -24,10 +35,7 @@ class BaseAgent(ABC):
         # Sistema de auditoria
         self.audit_trail = []
         
-        self.logger.info(f"Agente {agent_name} inicializado", extra={
-            'agent_id': self.agent_id,
-            'created_at': self.created_at.isoformat()
-        })
+        self.logger.info(f"Agente {agent_name} inicializado", agent_id=self.agent_id)
     
     def log_decision(
         self, 
@@ -58,20 +66,12 @@ class BaseAgent(ABC):
         
         self.audit_trail.append(audit_entry)
         
-        # Log estruturado
-        self.logger.info("Decisão registrada", extra={
-            'decision_type': decision_type,
-            'decision': decision,
-            'reasoning': reasoning
-        })
+        self.logger.info("Decisão registrada", 
+                        decision_type=decision_type,
+                        decision=decision)
     
     def get_agent_status(self) -> Dict[str, Any]:
-        """
-        Retorna status atual do agente.
-        
-        Returns:
-            Dict com informações de status
-        """
+        """Retorna status atual do agente."""
         return {
             'agent_name': self.agent_name,
             'agent_id': self.agent_id,

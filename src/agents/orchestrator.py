@@ -132,12 +132,6 @@ class SRAGOrchestrator(BaseAgent):
     async def _load_and_process_data(self, report_date: str) -> pd.DataFrame:
         """
         Carrega e processa dados SRAG do banco de dados.
-        
-        Args:
-            report_date: Data de referência do relatório
-            
-        Returns:
-            DataFrame com dados processados
         """
         try:
             self._update_step("data_loading")
@@ -147,10 +141,17 @@ class SRAGOrchestrator(BaseAgent):
             end_date = datetime.strptime(report_date, "%Y-%m-%d")
             start_date = end_date - timedelta(days=365)
             
+            # ADICIONAR: Garantir que não busca datas futuras
+            hoje = datetime.now()
+            if end_date > hoje:
+                logger.warning(f"Data do relatório ({report_date}) é futura, ajustando para hoje")
+                end_date = hoje
+                start_date = end_date - timedelta(days=365)
+            
             # Carregar dados usando a ferramenta de banco de dados
             raw_data = await self.database_tool.load_srag_data(
                 start_date=start_date.strftime("%Y-%m-%d"),
-                end_date=report_date
+                end_date=end_date.strftime("%Y-%m-%d")
             )
             
             # Aplicar guardrails nos dados

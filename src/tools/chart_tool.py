@@ -79,12 +79,18 @@ class ChartGeneratorTool(BaseTool):
             if 'DT_NOTIFIC' not in data.columns:
                 raise ValueError("Coluna DT_NOTIFIC não encontrada nos dados")
             
+            # Criar cópia para evitar modificar o original
+            df = data.copy()
+            
+            # Garantir que DT_NOTIFIC é datetime
+            if not pd.api.types.is_datetime64_any_dtype(df['DT_NOTIFIC']):
+                df['DT_NOTIFIC'] = pd.to_datetime(df['DT_NOTIFIC'], errors='coerce')
+            
             # Filtrar período
-            data['DT_NOTIFIC'] = pd.to_datetime(data['DT_NOTIFIC'])
-            period_data = data[
-                (data['DT_NOTIFIC'] >= start_date) & 
-                (data['DT_NOTIFIC'] <= end_date)
-            ]
+            period_data = df[
+                (df['DT_NOTIFIC'] >= start_date) & 
+                (df['DT_NOTIFIC'] <= end_date)
+            ].copy()
             
             # Agrupar por dia
             daily_cases = period_data.groupby(
@@ -160,24 +166,33 @@ class ChartGeneratorTool(BaseTool):
             if 'DT_NOTIFIC' not in data.columns:
                 raise ValueError("Coluna DT_NOTIFIC não encontrada nos dados")
             
+            # Criar cópia para evitar modificar o original
+            df = data.copy()
+            
+            # Garantir que DT_NOTIFIC é datetime
+            if not pd.api.types.is_datetime64_any_dtype(df['DT_NOTIFIC']):
+                df['DT_NOTIFIC'] = pd.to_datetime(df['DT_NOTIFIC'], errors='coerce')
+            
             # Filtrar período
-            data['DT_NOTIFIC'] = pd.to_datetime(data['DT_NOTIFIC'])
-            period_data = data[
-                (data['DT_NOTIFIC'] >= start_date) & 
-                (data['DT_NOTIFIC'] <= end_date)
-            ]
+            period_data = df[
+                (df['DT_NOTIFIC'] >= start_date) & 
+                (df['DT_NOTIFIC'] <= end_date)
+            ].copy()
             
-            # Agrupar por mês
-            monthly_cases = period_data.groupby([
-                period_data['DT_NOTIFIC'].dt.year,
-                period_data['DT_NOTIFIC'].dt.month
-            ]).size().reset_index(name='casos')
+            if period_data.empty:
+                raise ValueError("Nenhum dado encontrado no período dos últimos 12 meses")
             
-            # Criar coluna de data
+            # Extrair ano e mês
+            period_data['ano'] = period_data['DT_NOTIFIC'].dt.year
+            period_data['mes'] = period_data['DT_NOTIFIC'].dt.month
+            
+            # Agrupar por ano e mês
+            monthly_cases = period_data.groupby(['ano', 'mes']).size().reset_index(name='casos')
+            
+            # Criar coluna de data (primeiro dia de cada mês) - CORRIGIDO
             monthly_cases['data'] = pd.to_datetime(
-                monthly_cases[['DT_NOTIFIC', 'DT_NOTIFIC']].rename(
-                    columns={'DT_NOTIFIC': 'year', 'DT_NOTIFIC': 'month'}
-                ).assign(day=1)
+                monthly_cases['ano'].astype(str) + '-' + 
+                monthly_cases['mes'].astype(str).str.zfill(2) + '-01'
             )
             
             # Ordenar por data

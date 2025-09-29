@@ -4,13 +4,24 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 import asyncio
 
-# Adicionar src ao path
-sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
+# Adicionar diretório raiz ao path ANTES dos imports
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(SCRIPT_DIR) if SCRIPT_DIR.endswith('src') else SCRIPT_DIR
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
 
-from src.agents.orchestrator import SRAGOrchestrator
-from src.utils.logger import setup_logger
-from src.utils.config import Config
-from src.utils.guardrails import SRAGGuardrails
+# Agora importar módulos do projeto
+try:
+    from src.agents.orchestrator import SRAGOrchestrator
+    from src.utils.logger import setup_logger
+    from src.utils.config import Config
+    from src.utils.guardrails import SRAGGuardrails
+except ModuleNotFoundError:
+    # Se ainda falhar, tentar imports relativos
+    from agents.orchestrator import SRAGOrchestrator
+    from utils.logger import setup_logger
+    from utils.config import Config
+    from utils.guardrails import SRAGGuardrails
 
 # Configuração de logging
 logger = setup_logger(__name__)
@@ -54,7 +65,7 @@ class SRAGApplication:
         try:
             # Validação de entrada
             if report_date is None:
-                report_date = datetime.now().strftime("%Y-%m-%d")
+                report_date = "2024-12-31"
             
             self._validate_report_date(report_date)
             
@@ -76,7 +87,7 @@ class SRAGApplication:
             )
             
             # Validação final dos resultados
-            final_report = self.guardrails.validate_output(report_result)
+            final_report = self.guardrails.validate_final_report(report_result)
             
             logger.info("Relatório gerado com sucesso")
             return final_report

@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 from datetime import datetime
 from typing import Dict, Any, List, Optional
@@ -33,6 +34,27 @@ class ReportGeneratorTool(BaseTool):
         self.html_template = self._load_html_template()
         
         logger.info("ReportGeneratorTool inicializada")
+
+    def _convert_timestamps_to_str(self, obj):
+        """
+        Converte recursivamente objetos Timestamp para strings.
+        
+        Args:
+            obj: Objeto a ser convertido
+            
+        Returns:
+            Objeto com timestamps convertidos
+        """
+        import pandas as pd
+        
+        if isinstance(obj, pd.Timestamp):
+            return obj.isoformat()
+        elif isinstance(obj, dict):
+            return {k: self._convert_timestamps_to_str(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self._convert_timestamps_to_str(item) for item in obj]
+        else:
+            return obj
     
     async def generate_comprehensive_report(
         self, 
@@ -99,7 +121,20 @@ class ReportGeneratorTool(BaseTool):
                 f"Relatório gerado: {html_file.name}"
             )
             
-            return report_info
+            # Incluir seções obrigatórias para validação
+            result = {
+                'metadata': metadata,
+                'metrics': metrics,
+                'charts': charts,
+                'news_analysis': news_analysis,
+                'data_summary': data_summary,
+                'report_info': report_info
+            }
+
+            # Converter timestamps para strings (adicione esta linha)
+            result = self._convert_timestamps_to_str(result)
+
+            return result
             
         except Exception as e:
             execution_time = (datetime.now() - start_time).total_seconds()

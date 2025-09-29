@@ -1,3 +1,7 @@
+"""
+Sistema de configuração para o Sistema SRAG
+"""
+
 import os
 from typing import Any, Dict, Optional
 from dotenv import load_dotenv
