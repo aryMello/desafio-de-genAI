@@ -84,6 +84,9 @@ class DatabaseTool(BaseTool):
         """
         try:
             logger.info(f"Carregando dados SRAG: {start_date} a {end_date}")
+
+            if not os.path.exists(self.data_path):
+                raise FileNotFoundError(f"Arquivo de dados não encontrado: {self.data_path}")
             
             # Verificar cache
             cache_key = f"{start_date}_{end_date}"
@@ -152,7 +155,7 @@ class DatabaseTool(BaseTool):
             # Ler apenas o header para verificar colunas
             sample = pd.read_csv(
                 self.data_path,
-                encoding='utf-8',  # <-- MUDOU AQUI
+                encoding='utf-8',
                 sep=';',
                 nrows=0
             )
@@ -189,11 +192,11 @@ class DatabaseTool(BaseTool):
             DataFrame processado
         """
         try:
-            # Converter datas - CORRIGIDO PARA FORMATO ISO
+            # Converter datas
             if 'DT_NOTIFIC' in chunk.columns:
                 chunk['DT_NOTIFIC'] = pd.to_datetime(
                     chunk['DT_NOTIFIC'], 
-                    format='%Y-%m-%d',  # <-- MUDOU AQUI
+                    format='%Y-%m-%d',
                     errors='coerce'
                 )
                 
@@ -318,7 +321,6 @@ class DatabaseTool(BaseTool):
                 )
             
             # Campo de evolução simplificada
-            # CORRIGIDO: Aceitar string ou numérico
             if 'EVOLUCAO' in data.columns:
                 # Converter para string para comparação
                 evolucao_str = data['EVOLUCAO'].astype(str).str.strip()
@@ -331,14 +333,12 @@ class DatabaseTool(BaseTool):
                 logger.info(f"Distribuição EVOLUCAO_SIMPLES: {data['EVOLUCAO_SIMPLES'].value_counts().to_dict()}")
             
             # Campo de gravidade baseado em UTI e suporte ventilatório
-            # CORRIGIDO: Aceitar tanto 1 quanto '1'
             if 'UTI' in data.columns:
                 uti_values = pd.to_numeric(data['UTI'], errors='coerce')
                 data['CASO_GRAVE'] = (uti_values == 1).astype(int)
                 logger.info(f"Casos graves (UTI=1): {data['CASO_GRAVE'].sum()}")
             
             # Campo de status vacinal consolidado
-            # CORRIGIDO: Verificar múltiplos valores possíveis
             if 'VACINA_COV' in data.columns or any(col in data.columns for col in ['DOSE_1_COV', 'DOSE_2_COV']):
                 data['STATUS_VACINAL'] = 'Não informado'
                 
@@ -485,7 +485,12 @@ class DatabaseTool(BaseTool):
             
             # Período dos dados
             if 'DT_NOTIFIC' in data.columns:
-                dates = data['DT_NOTIFIC'].dropna()
+                # Garantir que é datetime
+                dt_col = data['DT_NOTIFIC']
+                if dt_col.dtype != 'datetime64[ns]':
+                    dt_col = pd.to_datetime(dt_col, errors='coerce')
+                
+                dates = dt_col.dropna()
                 if len(dates) > 0:
                     summary['date_range'] = {
                         'start': dates.min().strftime('%Y-%m-%d'),
