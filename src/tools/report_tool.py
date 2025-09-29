@@ -219,7 +219,7 @@ class ReportGeneratorTool(BaseTool):
                 <div class="row">
                     <div class="col-md-8">
                         <h1 class="display-4">Relatório SRAG</h1>
-                        <h2 class="text-muted">Síndrome Respiratória Aguda Grave</h2>
+                        <h2 class="text">Síndrome Respiratória Aguda Grave</h2>
                         <p class="lead">Data de Referência: <strong>{report_date}</strong></p>
                     </div>
                     <div class="col-md-4 text-right">

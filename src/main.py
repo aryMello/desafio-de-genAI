@@ -65,7 +65,7 @@ class SRAGApplication:
         try:
             # Validação de entrada
             if report_date is None:
-                report_date = "2024-12-31"
+                report_date = datetime.now().strftime("%Y-%m-%d")
             
             self._validate_report_date(report_date)
             
