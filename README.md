@@ -37,7 +37,7 @@ O sistema consulta dados do DataSUS, calcula métricas epidemiológicas e incorp
 - Python 3.9+
 - pip ou conda
 - Git
-- Chave da API OpenAI (para LLM) e News API (para as noticias)
+- Chave da API OpenAI (para LLM)
 
 ### Instalação
 
@@ -91,19 +91,19 @@ NEWS_API_KEY=sua_chave_news_api
 
 ```bash
 # Gerar relatório para hoje
-python src/main.py
+python main.py
 
 # Gerar relatório para data específica
-python src/main.py --date 2024-03-15
+python main.py --date 2024-03-15
 
 # Apenas verificar status do sistema
-python src/main.py --status-only
+python main.py --status-only
 
 # Gerar relatório sem gráficos
-python src/main.py --no-charts
+python main.py --no-charts
 
 # Gerar relatório sem análise de notícias
-python src/main.py --no-news
+python main.py --no-news
 ```
 
 ### Uso Programático
@@ -152,7 +152,6 @@ desafio-de-genAI/
 │   ├── raw/                  # Dados brutos
 │   ├── processed/            # Dados processados
 │   └── reports/              # Relatórios gerados
-├── assets/                   # Arquivos de midia
 ├── logs/                     # Arquivos de log
 ├── tests/                    # Testes automatizados
 ├── docs/                     # Documentação
@@ -179,8 +178,6 @@ pytest tests/test_integration.py -v
 ```
 
 ## Exemplo de Relatório Gerado
-
-![Video](./assets/examplo_relatorio_gerado.gif)
 
 ```
 =====================================
@@ -274,8 +271,10 @@ ARQUIVOS GERADOS
 
 ## Documentação Adicional
 
-- [Arquitetura Detalhada](docs/architecture_diagram.md)
-- [Dicionário de Dados](docs/dicionario-de-dados-2019-a-2025.pdf)
+- [Arquitetura Detalhada](docs/architecture_diagram.pdf)
+- [Dicionário de Dados](docs/data_dictionary.md)
+- [Guia de Desenvolvimento](docs/development_guide.md)
+- [Manual de Implantação](docs/deployment_guide.md)
 
 ## Contribuição
 
@@ -297,6 +296,14 @@ ARQUIVOS GERADOS
 - **Docstrings** em formato Google para documentação
 - **Testes unitários** para novas funcionalidades
 - **Cobertura mínima** de 80% nos testes
+
+## Roadmap
+
+### Versão 1.1 (Próxima)
+- [ ] Interface web para visualização de relatórios
+- [ ] Integração com mais fontes de dados
+- [ ] Alertas automáticos para métricas críticas
+- [ ] Dashboard em tempo real
 
 ## Conformidade e Regulamentações
 

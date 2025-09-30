@@ -219,53 +219,52 @@ class DatabaseTool(BaseTool):
     def _basic_cleaning(self, data: pd.DataFrame) -> pd.DataFrame:
         """
         Aplica limpeza básica nos dados.
+        
+        Args:
+            data: DataFrame a ser limpo
+            
+        Returns:
+            DataFrame limpo
         """
         try:
             # Remover registros com data de notificação inválida
             if 'DT_NOTIFIC' in data.columns:
                 data = data.dropna(subset=['DT_NOTIFIC'])
             
-            # Padronizar valores categóricos SEM substituir valores
+            # Padronizar valores categóricos
             categorical_columns = ['CS_SEXO', 'SG_UF', 'UTI', 'EVOLUCAO', 'VACINA_COV']
             
             for col in categorical_columns:
                 if col in data.columns:
-                    # Apenas converter para string e limpar espaços
-                    data[col] = data[col].astype(str).str.strip()
-                    # Substituir apenas valores vazios
-                    data[col] = data[col].replace(['nan', 'NaN', 'NAN', ''], np.nan)
+                    data[col] = data[col].astype(str).str.strip().str.upper()
+                    # Substituir valores inválidos por NaN
+                    data[col] = data[col].replace(['9', 'NAN', ''], np.nan)
             
             # Limpar idade
             if 'NU_IDADE_N' in data.columns:
+                # Converter para numérico e filtrar valores válidos (0-120)
                 data['NU_IDADE_N'] = pd.to_numeric(data['NU_IDADE_N'], errors='coerce')
                 data.loc[
                     (data['NU_IDADE_N'] < 0) | (data['NU_IDADE_N'] > 120), 
                     'NU_IDADE_N'
                 ] = np.nan
             
-            # Converter campos numéricos sem filtrar
-            numeric_fields = [
+            # Padronizar campos binários (1=Sim, 2=Não)
+            binary_fields = [
                 'UTI', 'SUPORT_VEN', 'FEBRE', 'TOSSE', 'DISPNEIA', 
                 'DESC_RESP', 'SATURACAO', 'DIARREIA', 'VOMITO'
             ]
             
-            for col in numeric_fields:
+            for col in binary_fields:
                 if col in data.columns:
                     data[col] = pd.to_numeric(data[col], errors='coerce')
-            
-            # DIAGNÓSTICO: Log dos valores encontrados
-            if 'EVOLUCAO' in data.columns:
-                evolucao_counts = data['EVOLUCAO'].value_counts(dropna=False).head(10)
-                logger.info(f"Valores EVOLUCAO encontrados: {evolucao_counts.to_dict()}")
-            
-            if 'UTI' in data.columns:
-                uti_counts = data['UTI'].value_counts(dropna=False).head(10)
-                logger.info(f"Valores UTI encontrados: {uti_counts.to_dict()}")
+                    # Manter apenas valores 1 e 2
+                    data.loc[~data[col].isin([1, 2]), col] = np.nan
             
             return data
             
         except Exception as e:
-            logger.error(f"Erro na limpeza básica: {e}", exc_info=True)
+            logger.error(f"Erro na limpeza básica: {e}")
             return data
     
     async def process_data(self, raw_data: pd.DataFrame) -> pd.DataFrame:
@@ -322,55 +321,31 @@ class DatabaseTool(BaseTool):
             
             # Campo de evolução simplificada
             if 'EVOLUCAO' in data.columns:
-                # Converter para string para comparação
-                evolucao_str = data['EVOLUCAO'].astype(str).str.strip()
-                
-                data['EVOLUCAO_SIMPLES'] = 'Ignorado'
-                data.loc[evolucao_str == '1', 'EVOLUCAO_SIMPLES'] = 'Cura'
-                data.loc[evolucao_str == '2', 'EVOLUCAO_SIMPLES'] = 'Óbito'
-                data.loc[evolucao_str == '3', 'EVOLUCAO_SIMPLES'] = 'Óbito por outras causas'
-                
-                logger.info(f"Distribuição EVOLUCAO_SIMPLES: {data['EVOLUCAO_SIMPLES'].value_counts().to_dict()}")
+                data['EVOLUCAO_SIMPLES'] = data['EVOLUCAO'].map({
+                    '1': 'Cura',
+                    '2': 'Óbito',
+                    '3': 'Óbito por outras causas',
+                    '9': 'Ignorado'
+                }).fillna('Ignorado')
             
             # Campo de gravidade baseado em UTI e suporte ventilatório
             if 'UTI' in data.columns:
-                uti_values = pd.to_numeric(data['UTI'], errors='coerce')
-                data['CASO_GRAVE'] = (uti_values == 1).astype(int)
-                logger.info(f"Casos graves (UTI=1): {data['CASO_GRAVE'].sum()}")
+                data['CASO_GRAVE'] = (data['UTI'] == 1).astype(int)
             
             # Campo de status vacinal consolidado
-            if 'VACINA_COV' in data.columns or any(col in data.columns for col in ['DOSE_1_COV', 'DOSE_2_COV']):
-                data['STATUS_VACINAL'] = 'Não informado'
-                
-                # Se tem campo VACINA_COV
-                if 'VACINA_COV' in data.columns:
-                    vacina_str = data['VACINA_COV'].astype(str).str.strip()
-                    data.loc[vacina_str == '2', 'STATUS_VACINAL'] = 'Não vacinado'
-                    data.loc[vacina_str == '1', 'STATUS_VACINAL'] = 'Vacinado'
-                
-                # Se tem campos de dose
-                if 'DOSE_1_COV' in data.columns:
-                    dose1 = pd.to_numeric(data['DOSE_1_COV'], errors='coerce')
-                    data.loc[dose1 == 1, 'STATUS_VACINAL'] = '1ª dose'
-                
-                if 'DOSE_2_COV' in data.columns:
-                    dose2 = pd.to_numeric(data['DOSE_2_COV'], errors='coerce')
-                    data.loc[dose2 == 1, 'STATUS_VACINAL'] = '2ª dose'
+            if all(col in data.columns for col in ['DOSE_1_COV', 'DOSE_2_COV']):
+                data['STATUS_VACINAL'] = 'Não vacinado'
+                data.loc[data['DOSE_1_COV'] == 1, 'STATUS_VACINAL'] = '1ª dose'
+                data.loc[data['DOSE_2_COV'] == 1, 'STATUS_VACINAL'] = '2ª dose'
                 
                 if 'DOSE_REF' in data.columns:
-                    dose_ref = pd.to_numeric(data['DOSE_REF'], errors='coerce')
-                    data.loc[dose_ref == 1, 'STATUS_VACINAL'] = 'Dose reforço'
-                
-                logger.info(f"Distribuição STATUS_VACINAL: {data['STATUS_VACINAL'].value_counts().to_dict()}")
+                    data.loc[data['DOSE_REF'] == 1, 'STATUS_VACINAL'] = 'Dose reforço'
             
             # Campo de número de sintomas
             symptom_cols = ['FEBRE', 'TOSSE', 'DISPNEIA', 'DESC_RESP', 'DIARREIA', 'VOMITO']
             available_symptoms = [col for col in symptom_cols if col in data.columns]
             
             if available_symptoms:
-                # Converter para numérico
-                for col in available_symptoms:
-                    data[col] = pd.to_numeric(data[col], errors='coerce')
                 data['NUM_SINTOMAS'] = data[available_symptoms].eq(1).sum(axis=1)
             
             # Campo de semana epidemiológica
@@ -382,7 +357,7 @@ class DatabaseTool(BaseTool):
             return data
             
         except Exception as e:
-            logger.error(f"Erro ao criar campos derivados: {e}", exc_info=True)
+            logger.error(f"Erro ao criar campos derivados: {e}")
             return data
     
     def _apply_classifications(self, data: pd.DataFrame) -> pd.DataFrame:
@@ -403,23 +378,17 @@ class DatabaseTool(BaseTool):
                 data.loc[data['NU_IDADE_N'] < 2, 'GRUPO_RISCO_IDADE'] = 'Alto'
             
             # Classificação de evolução
-            # CORRIGIDO: Aceitar string ou numérico
             if 'EVOLUCAO' in data.columns:
-                evolucao_str = data['EVOLUCAO'].astype(str).str.strip()
-                data['TEVE_OBITO'] = evolucao_str.isin(['2', '3']).astype(int)
-                logger.info(f"Total de óbitos identificados: {data['TEVE_OBITO'].sum()}")
+                data['TEVE_OBITO'] = (data['EVOLUCAO'].isin(['2', '3'])).astype(int)
             
             # Classificação de internação
-            # CORRIGIDO: Aceitar tanto 1 quanto '1'
             if 'UTI' in data.columns:
-                uti_numeric = pd.to_numeric(data['UTI'], errors='coerce')
-                data['TEVE_UTI'] = (uti_numeric == 1).astype(int)
-                logger.info(f"Total de internações em UTI: {data['TEVE_UTI'].sum()}")
+                data['TEVE_UTI'] = (data['UTI'] == 1).astype(int)
             
             return data
             
         except Exception as e:
-            logger.error(f"Erro ao aplicar classificações: {e}", exc_info=True)
+            logger.error(f"Erro ao aplicar classificações: {e}")
             return data
     
     def _validate_data_integrity(self, data: pd.DataFrame) -> pd.DataFrame:
