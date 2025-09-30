@@ -159,19 +159,7 @@ class MetricsCalculatorTool(BaseTool):
         reference_date: str,
         period_days: int = 90
     ) -> Dict[str, Any]:
-        """
-        Calcula a taxa de mortalidade por SRAG.
-        
-        Taxa = (Óbitos por SRAG / Total de casos) * 100
-        
-        Args:
-            data: DataFrame com dados SRAG
-            reference_date: Data de referência (YYYY-MM-DD)
-            period_days: Número de dias do período de análise
-            
-        Returns:
-            Dict com taxa de mortalidade e metadados
-        """
+        """Calcula a taxa de mortalidade por SRAG."""
         execution_id = self.log_execution_start("calculate_mortality_rate", {
             'reference_date': reference_date,
             'period_days': period_days,
@@ -195,7 +183,9 @@ class MetricsCalculatorTool(BaseTool):
                 (data['DT_NOTIFIC'] >= start_date) & 
                 (data['DT_NOTIFIC'] <= ref_date)
             )
-            period_data = data[period_mask]
+            period_data = data[period_mask].copy()
+            
+            logger.info(f"Registros no período: {len(period_data)}")
             
             if len(period_data) == 0:
                 return {
@@ -210,45 +200,8 @@ class MetricsCalculatorTool(BaseTool):
                     }
                 }
             
-<<<<<<< HEAD
-            if 'DT_NOTIFIC' not in data.columns:
-                logger.warning("Coluna DT_NOTIFIC não encontrada")
-                execution_time = (datetime.now() - start_time).total_seconds()
-                self.log_execution_end(execution_id, True, execution_time, "Sem DT_NOTIFIC")
-                
-                # Tentar calcular mesmo assim se tiver EVOLUCAO
-                if 'EVOLUCAO' in data.columns:
-                    total_cases = len(data)
-                    evolucao_str = data['EVOLUCAO'].astype(str).str.strip()
-                    deaths = evolucao_str.isin(['2', '3']).sum()
-                    mortality_rate = (deaths / total_cases) * 100 if total_cases > 0 else 0.0
-                    
-                    return {
-                        'rate': round(mortality_rate, 2),
-                        'interpretation': f"Taxa calculada sem filtro de data: {mortality_rate:.2f}%",
-                        'total_cases': int(total_cases),
-                        'deaths': int(deaths),
-                        'survival_rate': round(100 - mortality_rate, 2),
-                        'calculation_metadata': {
-                            'period_days': period_days,
-                            'reference_date': reference_date,
-                            'calculation_timestamp': datetime.now().isoformat(),
-                            'note': 'Calculado sem filtro de data'
-                        }
-                    }
-                
-                return {
-                    'rate': 0.0,
-                    'interpretation': "Sem dados disponíveis",
-                    'total_cases': 0,
-                    'deaths': 0,
-                    'survival_rate': 100.0,
-                    'calculation_metadata': {
-                        'period_days': period_days,
-                        'reference_date': reference_date,
-                        'calculation_timestamp': datetime.now().isoformat()
-                    }
-                }
+            total_cases = len(period_data)
+            deaths = 0
             
             # ESTRATÉGIA 1: Usar campo derivado TEVE_OBITO (preferencial)
             if 'TEVE_OBITO' in period_data.columns:
@@ -264,27 +217,37 @@ class MetricsCalculatorTool(BaseTool):
                 evolucao_values = evolucao_str.value_counts()
                 logger.info(f"Valores EVOLUCAO no período: {evolucao_values.to_dict()}")
                 
-=======
-            total_cases = len(period_data)
-            
-            # Contar óbitos
-            deaths = 0
-            if 'EVOLUCAO' in period_data.columns:
->>>>>>> parent of 3ea1b1c (update: review de metricas, e ajuste no readme para mais contexto)
                 # Códigos de óbito: '2' = Óbito por SRAG, '3' = Óbito por outras causas
-                death_mask = period_data['EVOLUCAO'].astype(str).isin(['2', '3'])
+                death_mask = evolucao_str.isin(['2', '3', '2.0', '3.0'])
                 deaths = death_mask.sum()
-            elif 'TEVE_OBITO' in period_data.columns:
-                deaths = int(period_data['TEVE_OBITO'].sum())
+                logger.info(f"Óbitos via EVOLUCAO (códigos 2/3): {deaths}")
+                
+                # Se ainda zero, tentar formato numérico
+                if deaths == 0:
+                    evolucao_num = pd.to_numeric(period_data['EVOLUCAO'], errors='coerce')
+                    death_mask_num = evolucao_num.isin([2, 3])
+                    deaths = death_mask_num.sum()
+                    logger.info(f"Óbitos via EVOLUCAO numérico: {deaths}")
+            
+            # ESTRATÉGIA 3: Outros campos possíveis
+            elif 'CLASSI_FIN' in period_data.columns:
+                # Classificação final - códigos de óbito podem variar
+                logger.info("Tentando calcular via CLASSI_FIN")
+                # Adicionar lógica específica se souber os códigos
+            
             else:
-                logger.warning("Coluna de evolução/óbito não encontrada")
+                logger.warning("Nenhuma coluna de evolução/óbito encontrada nos dados")
+                logger.info(f"Colunas disponíveis: {list(period_data.columns)}")
             
             # Calcular taxa de mortalidade
             mortality_rate = (deaths / total_cases) * 100 if total_cases > 0 else 0.0
             
             # Interpretação
             if mortality_rate == 0:
-                interpretation = "Nenhum óbito registrado no período"
+                if deaths == 0:
+                    interpretation = "Nenhum óbito registrado no período"
+                else:
+                    interpretation = f"Taxa de mortalidade: {mortality_rate:.1f}%"
             elif mortality_rate < 5:
                 interpretation = f"Taxa de mortalidade baixa: {mortality_rate:.1f}%"
             elif mortality_rate < 15:
@@ -311,15 +274,16 @@ class MetricsCalculatorTool(BaseTool):
             }
             
             execution_time = (datetime.now() - start_time).total_seconds()
-            self.log_execution_end(execution_id, True, execution_time, f"Taxa: {mortality_rate:.2f}%")
+            self.log_execution_end(execution_id, True, execution_time, 
+                                 f"Taxa: {mortality_rate:.2f}% ({deaths} óbitos)")
             
-            logger.info(f"Taxa de mortalidade calculada: {mortality_rate:.2f}%")
+            logger.info(f"Taxa de mortalidade calculada: {mortality_rate:.2f}% ({deaths}/{total_cases})")
             return result
             
         except Exception as e:
             execution_time = (datetime.now() - start_time).total_seconds()
             self.log_execution_end(execution_id, False, execution_time, error=str(e))
-            logger.error(f"Erro no cálculo da taxa de mortalidade: {e}")
+            logger.error(f"Erro no cálculo da taxa de mortalidade: {e}", exc_info=True)
             raise
     
     async def calculate_icu_occupancy_rate(
@@ -328,19 +292,7 @@ class MetricsCalculatorTool(BaseTool):
         reference_date: str,
         period_days: int = 30
     ) -> Dict[str, Any]:
-        """
-        Calcula a taxa de ocupação de UTI por casos de SRAG.
-        
-        Taxa = (Casos internados em UTI / Total de casos hospitalizados) * 100
-        
-        Args:
-            data: DataFrame com dados SRAG
-            reference_date: Data de referência (YYYY-MM-DD)
-            period_days: Número de dias do período de análise
-            
-        Returns:
-            Dict com taxa de ocupação de UTI e metadados
-        """
+        """Calcula a taxa de ocupação de UTI por casos de SRAG."""
         execution_id = self.log_execution_start("calculate_icu_occupancy_rate", {
             'reference_date': reference_date,
             'period_days': period_days,
@@ -364,7 +316,9 @@ class MetricsCalculatorTool(BaseTool):
                 (data['DT_NOTIFIC'] >= start_date) & 
                 (data['DT_NOTIFIC'] <= ref_date)
             )
-            period_data = data[period_mask]
+            period_data = data[period_mask].copy()
+            
+            logger.info(f"Registros no período: {len(period_data)}")
             
             if len(period_data) == 0:
                 return {
@@ -379,25 +333,53 @@ class MetricsCalculatorTool(BaseTool):
                     }
                 }
             
-            # Todos os casos SRAG são considerados hospitalizados
             total_hospitalized = len(period_data)
-            
-            # Contar casos em UTI
             icu_cases = 0
-            if 'UTI' in period_data.columns:
-                icu_mask = period_data['UTI'].astype(str) == '1'
-                icu_cases = icu_mask.sum()
-            elif 'TEVE_UTI' in period_data.columns:
+            
+            # ESTRATÉGIA 1: Usar campo derivado TEVE_UTI (preferencial)
+            if 'TEVE_UTI' in period_data.columns:
                 icu_cases = int(period_data['TEVE_UTI'].sum())
+                logger.info(f"UTIs via TEVE_UTI: {icu_cases}")
+            
+            # ESTRATÉGIA 2: Calcular diretamente do UTI
+            elif 'UTI' in period_data.columns:
+                # Tentar múltiplos formatos
+                uti_str = period_data['UTI'].astype(str).str.strip()
+                
+                # Log dos valores encontrados
+                uti_values = uti_str.value_counts()
+                logger.info(f"Valores UTI no período: {uti_values.to_dict()}")
+                
+                # Código '1' = Sim (internado em UTI)
+                icu_mask_str = uti_str == '1'
+                icu_cases = icu_mask_str.sum()
+                logger.info(f"UTIs via UTI string (código '1'): {icu_cases}")
+                
+                # Se ainda zero, tentar formato numérico
+                if icu_cases == 0:
+                    uti_num = pd.to_numeric(period_data['UTI'], errors='coerce')
+                    icu_mask_num = uti_num == 1
+                    icu_cases = icu_mask_num.sum()
+                    logger.info(f"UTIs via UTI numérico (código 1): {icu_cases}")
+            
+            # ESTRATÉGIA 3: Campo alternativo
+            elif 'CASO_GRAVE' in period_data.columns:
+                icu_cases = int(period_data['CASO_GRAVE'].sum())
+                logger.info(f"UTIs via CASO_GRAVE: {icu_cases}")
+            
             else:
-                logger.warning("Coluna de UTI não encontrada")
+                logger.warning("Nenhuma coluna de UTI encontrada nos dados")
+                logger.info(f"Colunas disponíveis: {list(period_data.columns)}")
             
             # Calcular taxa de ocupação de UTI
             icu_rate = (icu_cases / total_hospitalized) * 100 if total_hospitalized > 0 else 0.0
             
             # Interpretação
             if icu_rate == 0:
-                interpretation = "Nenhuma internação em UTI registrada"
+                if icu_cases == 0:
+                    interpretation = "Nenhuma internação em UTI registrada"
+                else:
+                    interpretation = f"Taxa de UTI: {icu_rate:.1f}%"
             elif icu_rate < 20:
                 interpretation = f"Taxa de UTI baixa: {icu_rate:.1f}%"
             elif icu_rate < 40:
@@ -424,15 +406,16 @@ class MetricsCalculatorTool(BaseTool):
             }
             
             execution_time = (datetime.now() - start_time).total_seconds()
-            self.log_execution_end(execution_id, True, execution_time, f"Taxa: {icu_rate:.2f}%")
+            self.log_execution_end(execution_id, True, execution_time, 
+                                 f"Taxa: {icu_rate:.2f}% ({icu_cases} UTIs)")
             
-            logger.info(f"Taxa de ocupação de UTI calculada: {icu_rate:.2f}%")
+            logger.info(f"Taxa de ocupação de UTI calculada: {icu_rate:.2f}% ({icu_cases}/{total_hospitalized})")
             return result
             
         except Exception as e:
             execution_time = (datetime.now() - start_time).total_seconds()
             self.log_execution_end(execution_id, False, execution_time, error=str(e))
-            logger.error(f"Erro no cálculo da taxa de ocupação de UTI: {e}")
+            logger.error(f"Erro no cálculo da taxa de ocupação de UTI: {e}", exc_info=True)
             raise
     
     async def calculate_vaccination_rate(
