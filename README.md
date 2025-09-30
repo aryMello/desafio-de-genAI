@@ -6,6 +6,8 @@ Sistema baseado em Inteligência Artificial Generativa para geração automatiza
 
 O sistema consulta dados do DataSUS, calcula métricas epidemiológicas e incorpora análise de notícias em tempo real para fornecer relatórios completos e contextualizados sobre surtos de SRAG.
 
+![Video](./assets/examplo_relatorio_gerado.gif)
+
 ## Objetivos
 
 - **Automatização**: Geração de relatórios sem intervenção manual
@@ -28,7 +30,12 @@ O sistema consulta dados do DataSUS, calcula métricas epidemiológicas e incorp
 
 ## Arquitetura
 
+### Simplificada
+
 ![Imagem](./assets/Arquitetura.png)
+
+### Detalhada - Diagrama
+![Diagrama](./assets/diagrama_de_arquitetura.png)
 
 ## Instalação e Configuração
 
@@ -64,6 +71,9 @@ cp .env.example .env
 # API Keys
 OPENAI_API_KEY=sua_chave_openai_aqui
 
+# News API
+NEWS_API_KEY=sua_chave_news_api
+
 # Dados
 DATA_PATH=data/raw/srag_data.csv
 
@@ -74,9 +84,6 @@ LOG_FILE=logs/srag_system.log
 # Cache
 CACHE_TTL=3600
 REDIS_URL=redis://localhost:6379
-
-# News API
-NEWS_API_KEY=sua_chave_news_api
 ```
 
 ### Download dos Dados SRAG
@@ -154,6 +161,7 @@ desafio-de-genAI/
 │   └── reports/              # Relatórios gerados
 ├── assets/                   # Arquivos de midia
 ├── logs/                     # Arquivos de log
+├── assets/                   # Arquivos de imagem
 ├── tests/                    # Testes automatizados
 ├── docs/                     # Documentação
 ├── main.py                   # Ponto de entrada
@@ -274,8 +282,13 @@ ARQUIVOS GERADOS
 
 ## Documentação Adicional
 
+<<<<<<< HEAD
 - [Arquitetura Detalhada](docs/architecture_diagram.md)
 - [Dicionário de Dados](docs/dicionario-de-dados-2019-a-2025.pdf)
+=======
+- [Arquitetura Detalhada](./docs/Arquitetura_Tecnica_Detalhada.pdf)
+- [Dicionário de Dados](./docs/dicionario-de-dados-2019-a-2025.pdf)
+>>>>>>> refs/remotes/origin/main
 
 ## Contribuição
 
