@@ -220,67 +220,11 @@ class MetricsCalculatorTool(BaseTool):
                     }
                 }
             
-<<<<<<< HEAD
-            if 'DT_NOTIFIC' not in data.columns:
-                logger.warning("Coluna DT_NOTIFIC não encontrada")
-                execution_time = (datetime.now() - start_time).total_seconds()
-                self.log_execution_end(execution_id, True, execution_time, "Sem DT_NOTIFIC")
-                
-                # Tentar calcular mesmo assim se tiver EVOLUCAO
-                if 'EVOLUCAO' in data.columns:
-                    total_cases = len(data)
-                    evolucao_str = data['EVOLUCAO'].astype(str).str.strip()
-                    deaths = evolucao_str.isin(['2', '3']).sum()
-                    mortality_rate = (deaths / total_cases) * 100 if total_cases > 0 else 0.0
-                    
-                    return {
-                        'rate': round(mortality_rate, 2),
-                        'interpretation': f"Taxa calculada sem filtro de data: {mortality_rate:.2f}%",
-                        'total_cases': int(total_cases),
-                        'deaths': int(deaths),
-                        'survival_rate': round(100 - mortality_rate, 2),
-                        'calculation_metadata': {
-                            'period_days': period_days,
-                            'reference_date': reference_date,
-                            'calculation_timestamp': datetime.now().isoformat(),
-                            'note': 'Calculado sem filtro de data'
-                        }
-                    }
-                
-                return {
-                    'rate': 0.0,
-                    'interpretation': "Sem dados disponíveis",
-                    'total_cases': 0,
-                    'deaths': 0,
-                    'survival_rate': 100.0,
-                    'calculation_metadata': {
-                        'period_days': period_days,
-                        'reference_date': reference_date,
-                        'calculation_timestamp': datetime.now().isoformat()
-                    }
-                }
-            
-            # ESTRATÉGIA 1: Usar campo derivado TEVE_OBITO (preferencial)
-            if 'TEVE_OBITO' in period_data.columns:
-                deaths = int(period_data['TEVE_OBITO'].sum())
-                logger.info(f"Óbitos via TEVE_OBITO: {deaths}")
-            
-            # ESTRATÉGIA 2: Calcular diretamente do EVOLUCAO
-            elif 'EVOLUCAO' in period_data.columns:
-                # Tentar múltiplos formatos
-                evolucao_str = period_data['EVOLUCAO'].astype(str).str.strip()
-                
-                # Log dos valores encontrados
-                evolucao_values = evolucao_str.value_counts()
-                logger.info(f"Valores EVOLUCAO no período: {evolucao_values.to_dict()}")
-                
-=======
             total_cases = len(period_data)
             
             # Contar óbitos
             deaths = 0
             if 'EVOLUCAO' in period_data.columns:
->>>>>>> parent of 3ea1b1c (update: review de metricas, e ajuste no readme para mais contexto)
                 # Códigos de óbito: '2' = Óbito por SRAG, '3' = Óbito por outras causas
                 death_mask = period_data['EVOLUCAO'].astype(str).isin(['2', '3'])
                 deaths = death_mask.sum()
