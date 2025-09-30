@@ -6,6 +6,8 @@ Sistema baseado em Inteligência Artificial Generativa para geração automatiza
 
 O sistema consulta dados do DataSUS, calcula métricas epidemiológicas e incorpora análise de notícias em tempo real para fornecer relatórios completos e contextualizados sobre surtos de SRAG.
 
+![Video](./assets/examplo_relatorio_gerado.gif)
+
 ## Objetivos
 
 - **Automatização**: Geração de relatórios sem intervenção manual
