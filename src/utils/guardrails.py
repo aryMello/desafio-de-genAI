@@ -339,18 +339,15 @@ class SRAGGuardrails:
             DataFrame anonimizado
         """
         try:
-            # Lista COMPLETA de colunas sensíveis
-            sensitive_columns = [
-                'CPF', 'NM_PACIENT', 'NU_TEL', 
-                'NM_MAE_PAC', 'ENDERECO', 'BAIRRO', 
-                'CEP', 'EMAIL', 'NM_FANTASI', 'TELEFONE'
-            ]
+            anonymized_data = data.copy()
             
-            # Remover colunas sensíveis existentes
-            columns_to_drop = [col for col in sensitive_columns if col in data.columns]
-            if columns_to_drop:
-                data = data.drop(columns=columns_to_drop)
-                logger.info(f"Removidas {len(columns_to_drop)} colunas sensíveis: {columns_to_drop}")
+            # Remover colunas completamente sensíveis
+            columns_to_remove = [col for col in self.sensitive_columns 
+                               if col in anonymized_data.columns]
+            
+            if columns_to_remove:
+                anonymized_data = anonymized_data.drop(columns=columns_to_remove)
+                logger.info(f"Removidas {len(columns_to_remove)} colunas sensíveis")
             
             # Generalizar municípios para apenas UF
             if 'ID_MUNICIP' in anonymized_data.columns and 'SG_UF' in anonymized_data.columns:
@@ -621,21 +618,19 @@ class SRAGGuardrails:
             String com assinatura hash
         """
         try:
-            import json
-            import hashlib
+            # Criar string para hash baseada em elementos-chave
+            signature_data = {
+                'report_date': report.get('metadata', {}).get('report_date'),
+                'metrics_count': len(report.get('metrics', {})),
+                'validation_timestamp': datetime.now().isoformat(),
+                'guardrails_version': '1.0'
+            }
             
-            # Serializar de forma DETERMINÍSTICA
-            report_str = json.dumps(report, sort_keys=True, default=str)
+            signature_string = str(signature_data)
+            signature_hash = hashlib.sha256(signature_string.encode()).hexdigest()[:16]
             
-            # Gerar hash
-            hash_obj = hashlib.sha256(report_str.encode()) 
-            signature = f"SRAG-{hash_obj.hexdigest()[:16]}"
-            
-            return signature
+            return f"SRAG-{signature_hash}"
             
         except Exception as e:
-            logger.error(f"Erro ao gerar assinatura: {e}")
-            # Usar hash do timestamp como fallback
-            import hashlib
-            fallback = hashlib.md5(str(datetime.now().timestamp()).encode()).hexdigest()[:16]
-            return f"SRAG-{fallback}"
+            logger.error(f"Erro na geração de assinatura: {e}")
+            return "SRAG-validation-error"

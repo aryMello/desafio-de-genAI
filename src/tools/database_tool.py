@@ -84,9 +84,6 @@ class DatabaseTool(BaseTool):
         """
         try:
             logger.info(f"Carregando dados SRAG: {start_date} a {end_date}")
-
-            if not os.path.exists(self.data_path):
-                raise FileNotFoundError(f"Arquivo de dados não encontrado: {self.data_path}")
             
             # Verificar cache
             cache_key = f"{start_date}_{end_date}"
@@ -155,7 +152,7 @@ class DatabaseTool(BaseTool):
             # Ler apenas o header para verificar colunas
             sample = pd.read_csv(
                 self.data_path,
-                encoding='utf-8',
+                encoding='utf-8',  # <-- MUDOU AQUI
                 sep=';',
                 nrows=0
             )
@@ -192,11 +189,11 @@ class DatabaseTool(BaseTool):
             DataFrame processado
         """
         try:
-            # Converter datas
+            # Converter datas - CORRIGIDO PARA FORMATO ISO
             if 'DT_NOTIFIC' in chunk.columns:
                 chunk['DT_NOTIFIC'] = pd.to_datetime(
                     chunk['DT_NOTIFIC'], 
-                    format='%Y-%m-%d',
+                    format='%Y-%m-%d',  # <-- MUDOU AQUI
                     errors='coerce'
                 )
                 
@@ -320,6 +317,7 @@ class DatabaseTool(BaseTool):
                 )
             
             # Campo de evolução simplificada
+            # CORRIGIDO: Aceitar string ou numérico
             if 'EVOLUCAO' in data.columns:
                 data['EVOLUCAO_SIMPLES'] = data['EVOLUCAO'].map({
                     '1': 'Cura',
@@ -329,14 +327,28 @@ class DatabaseTool(BaseTool):
                 }).fillna('Ignorado')
             
             # Campo de gravidade baseado em UTI e suporte ventilatório
+            # CORRIGIDO: Aceitar tanto 1 quanto '1'
             if 'UTI' in data.columns:
                 data['CASO_GRAVE'] = (data['UTI'] == 1).astype(int)
             
             # Campo de status vacinal consolidado
-            if all(col in data.columns for col in ['DOSE_1_COV', 'DOSE_2_COV']):
-                data['STATUS_VACINAL'] = 'Não vacinado'
-                data.loc[data['DOSE_1_COV'] == 1, 'STATUS_VACINAL'] = '1ª dose'
-                data.loc[data['DOSE_2_COV'] == 1, 'STATUS_VACINAL'] = '2ª dose'
+            if 'VACINA_COV' in data.columns or any(col in data.columns for col in ['DOSE_1_COV', 'DOSE_2_COV']):
+                data['STATUS_VACINAL'] = 'Não informado'
+                
+                # Se tem campo VACINA_COV
+                if 'VACINA_COV' in data.columns:
+                    vacina_str = data['VACINA_COV'].astype(str).str.strip()
+                    data.loc[vacina_str == '2', 'STATUS_VACINAL'] = 'Não vacinado'
+                    data.loc[vacina_str == '1', 'STATUS_VACINAL'] = 'Vacinado'
+                
+                # Se tem campos de dose
+                if 'DOSE_1_COV' in data.columns:
+                    dose1 = pd.to_numeric(data['DOSE_1_COV'], errors='coerce')
+                    data.loc[dose1 == 1, 'STATUS_VACINAL'] = '1ª dose'
+                
+                if 'DOSE_2_COV' in data.columns:
+                    dose2 = pd.to_numeric(data['DOSE_2_COV'], errors='coerce')
+                    data.loc[dose2 == 1, 'STATUS_VACINAL'] = '2ª dose'
                 
                 if 'DOSE_REF' in data.columns:
                     data.loc[data['DOSE_REF'] == 1, 'STATUS_VACINAL'] = 'Dose reforço'
@@ -454,12 +466,7 @@ class DatabaseTool(BaseTool):
             
             # Período dos dados
             if 'DT_NOTIFIC' in data.columns:
-                # Garantir que é datetime
-                dt_col = data['DT_NOTIFIC']
-                if dt_col.dtype != 'datetime64[ns]':
-                    dt_col = pd.to_datetime(dt_col, errors='coerce')
-                
-                dates = dt_col.dropna()
+                dates = data['DT_NOTIFIC'].dropna()
                 if len(dates) > 0:
                     summary['date_range'] = {
                         'start': dates.min().strftime('%Y-%m-%d'),

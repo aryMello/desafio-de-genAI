@@ -26,7 +26,7 @@ class DatabaseSettings:
     chunk_size: int = 10000
     cache_ttl: int = 3600  # 1 hora em segundos
     max_memory_usage_mb: int = 2048
-    encoding: str = "utf-8"
+    encoding: str = "latin-1"
     separator: str = ";"
     
     # Colunas essenciais do DataSUS SRAG
