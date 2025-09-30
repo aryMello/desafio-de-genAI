@@ -279,7 +279,7 @@ ARQUIVOS GERADOS
 
 ## Documentação Adicional
 
-- [Arquitetura Detalhada](./docs/Arquitetura_Técnica_Detalhada.pdf)
+- [Arquitetura Detalhada](./docs/Arquitetura_Tecnica_Detalhada.pdf)
 - [Dicionário de Dados](./docs/dicionario-de-dados-2019-a-2025.pdf)
 
 ## Contribuição
