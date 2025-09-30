@@ -317,7 +317,6 @@ class DatabaseTool(BaseTool):
                 )
             
             # Campo de evolução simplificada
-            # CORRIGIDO: Aceitar string ou numérico
             if 'EVOLUCAO' in data.columns:
                 data['EVOLUCAO_SIMPLES'] = data['EVOLUCAO'].map({
                     '1': 'Cura',
@@ -327,11 +326,11 @@ class DatabaseTool(BaseTool):
                 }).fillna('Ignorado')
             
             # Campo de gravidade baseado em UTI e suporte ventilatório
-            # CORRIGIDO: Aceitar tanto 1 quanto '1'
             if 'UTI' in data.columns:
                 data['CASO_GRAVE'] = (data['UTI'] == 1).astype(int)
             
             # Campo de status vacinal consolidado
+<<<<<<< HEAD
             if 'VACINA_COV' in data.columns or any(col in data.columns for col in ['DOSE_1_COV', 'DOSE_2_COV']):
                 data['STATUS_VACINAL'] = 'Não informado'
                 
@@ -349,6 +348,12 @@ class DatabaseTool(BaseTool):
                 if 'DOSE_2_COV' in data.columns:
                     dose2 = pd.to_numeric(data['DOSE_2_COV'], errors='coerce')
                     data.loc[dose2 == 1, 'STATUS_VACINAL'] = '2ª dose'
+=======
+            if all(col in data.columns for col in ['DOSE_1_COV', 'DOSE_2_COV']):
+                data['STATUS_VACINAL'] = 'Não vacinado'
+                data.loc[data['DOSE_1_COV'] == 1, 'STATUS_VACINAL'] = '1ª dose'
+                data.loc[data['DOSE_2_COV'] == 1, 'STATUS_VACINAL'] = '2ª dose'
+>>>>>>> parent of 3ea1b1c (update: review de metricas, e ajuste no readme para mais contexto)
                 
                 if 'DOSE_REF' in data.columns:
                     data.loc[data['DOSE_REF'] == 1, 'STATUS_VACINAL'] = 'Dose reforço'

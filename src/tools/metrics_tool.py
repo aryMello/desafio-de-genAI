@@ -210,6 +210,7 @@ class MetricsCalculatorTool(BaseTool):
                     }
                 }
             
+<<<<<<< HEAD
             if 'DT_NOTIFIC' not in data.columns:
                 logger.warning("Coluna DT_NOTIFIC não encontrada")
                 execution_time = (datetime.now() - start_time).total_seconds()
@@ -263,6 +264,13 @@ class MetricsCalculatorTool(BaseTool):
                 evolucao_values = evolucao_str.value_counts()
                 logger.info(f"Valores EVOLUCAO no período: {evolucao_values.to_dict()}")
                 
+=======
+            total_cases = len(period_data)
+            
+            # Contar óbitos
+            deaths = 0
+            if 'EVOLUCAO' in period_data.columns:
+>>>>>>> parent of 3ea1b1c (update: review de metricas, e ajuste no readme para mais contexto)
                 # Códigos de óbito: '2' = Óbito por SRAG, '3' = Óbito por outras causas
                 death_mask = period_data['EVOLUCAO'].astype(str).isin(['2', '3'])
                 deaths = death_mask.sum()
