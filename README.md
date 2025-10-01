@@ -188,8 +188,6 @@ pytest tests/test_integration.py -v
 
 ## Exemplo de Relatório Gerado
 
-![Video](./assets/examplo_relatorio_gerado.gif)
-
 ```
 =====================================
 RELATÓRIO SRAG - 2024-03-15
@@ -282,13 +280,8 @@ ARQUIVOS GERADOS
 
 ## Documentação Adicional
 
-<<<<<<< HEAD
-- [Arquitetura Detalhada](docs/architecture_diagram.md)
-- [Dicionário de Dados](docs/dicionario-de-dados-2019-a-2025.pdf)
-=======
 - [Arquitetura Detalhada](./docs/Arquitetura_Tecnica_Detalhada.pdf)
 - [Dicionário de Dados](./docs/dicionario-de-dados-2019-a-2025.pdf)
->>>>>>> refs/remotes/origin/main
 
 ## Contribuição
 
