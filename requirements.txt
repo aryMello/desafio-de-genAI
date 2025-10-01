@@ -45,7 +45,7 @@ lxml>=4.9.0,<5.0.0
 
 # Extração de conteúdo de notícias
 newspaper3k>=0.2.8,<1.0.0
-python-readability>=0.8.1
+python-readability
 
 # CONFIGURAÇÃO E AMBIENTE
 
