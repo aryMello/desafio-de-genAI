@@ -4,6 +4,14 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 import asyncio
 
+# Load environment variables from .env file (must be before other imports)
+try:
+    from dotenv import load_dotenv
+    env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
+    load_dotenv(dotenv_path=env_path, verbose=False)
+except ImportError:
+    pass  # python-dotenv not required, but recommended
+
 # Adicionar diretório raiz ao path ANTES dos imports
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(SCRIPT_DIR) if SCRIPT_DIR.endswith('src') else SCRIPT_DIR

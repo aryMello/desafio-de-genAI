@@ -31,26 +31,47 @@ class DatabaseSettings:
     
     # Colunas essenciais do DataSUS SRAG
     essential_columns: List[str] = field(default_factory=lambda: [
+        'NU_NOTIFIC',      # Número de notificação
         'DT_NOTIFIC',      # Data de notificação
-        'SG_UF',           # Estado
-        'ID_MUNICIP',      # Município 
+        'SG_UF_NOT',       # UF de notificação
+        'CO_MUN_NOT',      # Código do município de notificação
         'CS_SEXO',         # Sexo
-        'NU_IDADE_N',      # Idade
+        'NU_IDADE_N',      # Idade em número
+        'DT_NASC',         # Data de nascimento
         'UTI',             # Internação em UTI
         'SUPORT_VEN',      # Suporte ventilatório
         'EVOLUCAO',        # Evolução do caso
         'DT_EVOLUCA',      # Data da evolução
+        'HOSPITAL',        # Internação hospitalar
+        'DT_INTERNA',      # Data de internação
         'VACINA_COV',      # Vacinação COVID
-        'DOSE_1_COV',      # 1ª dose
-        'DOSE_2_COV',      # 2ª dose
-        'DOSE_REF',        # Dose de reforço
+        'DOSE_1_COV',      # 1ª dose COVID
+        'DOSE_2_COV',      # 2ª dose COVID
+        'DOSE_REF',        # Dose de reforço COVID
         'FEBRE',           # Sintoma: febre
         'TOSSE',           # Sintoma: tosse
+        'GARGANTA',        # Sintoma: garganta
         'DISPNEIA',        # Sintoma: dispneia
         'DESC_RESP',       # Desconforto respiratório
         'SATURACAO',       # Saturação O2
         'DIARREIA',        # Sintoma: diarreia
-        'VOMITO'           # Sintoma: vômito
+        'VOMITO',          # Sintoma: vômito
+        'AMOSTRA',         # Coleta de amostra
+        'DT_COLETA',       # Data de coleta
+        'PCR_RESUL',       # Resultado PCR
+        'DT_PCR',          # Data do PCR
+        'CLASSI_FIN',      # Classificação final
+        'CRITERIO',        # Critério de confirmação
+        'CS_RACA',         # Raça/cor
+        'CS_ETINIA',       # Etnia
+        'CS_GESTANT',      # Gestação
+        'CARDIOPATI',      # Cardiopatia
+        'DIABETES',        # Diabetes
+        'ASMA',            # Asma
+        'PNEUMOPATI',      # Pneumopatia
+        'IMUNODEPRE',      # Imunodeficiência
+        'OBESIDADE',       # Obesidade
+        'TABAG'            # Tabagismo
     ])
     
     # Mapeamento de códigos para valores legíveis
@@ -209,16 +230,8 @@ class SecuritySettings:
     # Colunas consideradas sensíveis
     sensitive_columns: List[str] = field(default_factory=lambda: [
         'NU_NOTIFIC',      # Número da notificação
-        'CO_UNI_NOT',      # Código da unidade notificadora
-        'NM_UNIDADE',      # Nome da unidade
-        'NM_MUNIC',        # Nome do município
-        'NM_PACIENT',      # Nome do paciente
-        'CPF',             # CPF
-        'IDENTIDADE',      # RG
-        'NM_MAE_PAC',      # Nome da mãe
         'DT_NASC',         # Data de nascimento específica
-        'NU_TEL',          # Telefone
-        'CO_CARTAO_CNS'    # Cartão SUS
+        'DT_DIGITA'        # Data de digitação
     ])
     
     # Termos proibidos em conteúdo de notícias

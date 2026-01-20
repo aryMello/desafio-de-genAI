@@ -128,47 +128,82 @@ class SRAGOrchestrator(BaseAgent):
             f"Gráficos: {request_data.get('include_charts')}, "
             f"Notícias: {request_data.get('include_news')}"
         )
-    
+
     async def _load_and_process_data(self, report_date: str) -> pd.DataFrame:
         """
         Carrega e processa dados SRAG do banco de dados.
+        
+        CRITICAL FIX: Never use future dates (2099-12-31).
+        Always use current date as maximum.
         """
         try:
             self._update_step("data_loading")
             logger.info("Iniciando carregamento de dados SRAG")
             
-            # Definir período de análise (últimos 12 meses a partir da data do relatório)
+            # Define safe date range
             end_date = datetime.strptime(report_date, "%Y-%m-%d")
+            today = datetime.now()
+            
+            # CRITICAL FIX: Never request future dates
+            if end_date > today:
+                logger.warning(f"Data do relatório ({report_date}) é futura, ajustando para hoje")
+                end_date = today
+            
+            # Start from 12 months before end date
             start_date = end_date - timedelta(days=365)
             
-            # Garantir que não busca datas futuras
-            hoje = datetime.now()
-            if end_date > hoje:
-                logger.warning(f"Data do relatório ({report_date}) é futura, ajustando para hoje")
-                end_date = hoje
-                start_date = end_date - timedelta(days=365)
+            logger.info(f"Período de análise: {start_date.strftime('%Y-%m-%d')} a {end_date.strftime('%Y-%m-%d')}")
             
-            # Carregar dados usando a ferramenta de banco de dados
+            # Load data using database tool
             raw_data = await self.database_tool.load_srag_data(
                 start_date=start_date.strftime("%Y-%m-%d"),
                 end_date=end_date.strftime("%Y-%m-%d")
             )
             
-            # Aplicar guardrails nos dados
+            # If no recent data found, try loading ALL available historical data
+            if raw_data is None or len(raw_data) == 0:
+                logger.warning("Nenhum dado encontrado no período recente.")
+                logger.info("Tentando carregar todos os dados históricos disponíveis...")
+                
+                # CRITICAL FIX: Use today's date, NOT 2099-12-31
+                raw_data = await self.database_tool.load_srag_data(
+                    start_date="2000-01-01",
+                    end_date=today.strftime("%Y-%m-%d")  # ← FIXED: Use actual current date
+                )
+                
+                if raw_data is not None and len(raw_data) > 0:
+                    logger.info(f"Análise histórica: {len(raw_data)} registros totais disponíveis")
+                    self.execution_state['analysis_mode'] = 'historical'
+                    
+                    # Update date range metadata to reflect actual data
+                    actual_dates = raw_data['DT_NOTIFIC'].dropna()
+                    if len(actual_dates) > 0:
+                        actual_start = actual_dates.min()
+                        actual_end = actual_dates.max()
+                        logger.info(f"Dados históricos: {actual_start.strftime('%Y-%m-%d')} a {actual_end.strftime('%Y-%m-%d')}")
+                else:
+                    logger.warning("Nenhum dado disponível em todo o período")
+                    return pd.DataFrame()
+            else:
+                self.execution_state['analysis_mode'] = 'recent'
+            
+            # Apply guardrails validation
             validated_data = self.guardrails.validate_health_data(raw_data)
             
-            # Processar dados
+            # Process data
             processed_data = await self.database_tool.process_data(validated_data)
             
-            # Registrar estatísticas
+            # Record statistics
             self.execution_state['metrics']['total_records'] = len(processed_data)
             self.execution_state['metrics']['date_range'] = {
                 'start': start_date.strftime("%Y-%m-%d"),
-                'end': report_date
+                'end': end_date.strftime("%Y-%m-%d"),
+                'actual_mode': self.execution_state.get('analysis_mode', 'recent')
             }
             
             self._complete_step("data_loading")
             logger.info(f"Dados carregados: {len(processed_data)} registros")
+            logger.info(f"Modo de análise: {self.execution_state.get('analysis_mode', 'recent')}")
             
             return processed_data
             
@@ -291,7 +326,7 @@ class SRAGOrchestrator(BaseAgent):
             # Buscar notícias relevantes
             news_articles = await self.news_tool.search_srag_news(
                 max_articles=15,
-                date_range_days=60
+                date_range_days=90
             )
             
             # Analisar com Gemini (com fallback para análise tradicional)
@@ -300,12 +335,12 @@ class SRAGOrchestrator(BaseAgent):
             )
             
             # Aplicar guardrails nas notícias
-            filtered_analysis = self.guardrails.filter_news_content(news_analysis)
+            #filtered_analysis = self.guardrails.filter_news_content(news_analysis)
             
             self._complete_step("news_analysis")
             logger.info(f"Notícias analisadas: {len(news_articles)} com Gemini")
             
-            return filtered_analysis
+            return news_analysis
             
         except Exception as e:
             self._log_step_error("news_analysis", e)

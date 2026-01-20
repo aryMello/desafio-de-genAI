@@ -179,8 +179,21 @@ class ChartGeneratorTool(BaseTool):
                 (df['DT_NOTIFIC'] <= end_date)
             ].copy()
             
+            # Se não houver dados nos últimos 12 meses, usar os dados mais recentes disponíveis
             if period_data.empty:
-                raise ValueError("Nenhum dado encontrado no período dos últimos 12 meses")
+                logger.warning("Nenhum dado encontrado no período dos últimos 12 meses. Usando dados mais antigos...")
+                # Usar os últimos 12 meses de dados disponíveis
+                df_sorted = df.sort_values('DT_NOTIFIC', ascending=False)
+                if len(df_sorted) > 0:
+                    # Pegar dados dos últimos 365 dias de registros (não de data de notificação)
+                    latest_date = df_sorted['DT_NOTIFIC'].max()
+                    fallback_start = latest_date - timedelta(days=365)
+                    period_data = df[df['DT_NOTIFIC'] >= fallback_start].copy()
+                    
+                    if period_data.empty:
+                        raise ValueError("Nenhum dado disponível para gerar gráfico mensal")
+                else:
+                    raise ValueError("Nenhum dado disponível para gerar gráfico mensal")
             
             # Extrair ano e mês
             period_data['ano'] = period_data['DT_NOTIFIC'].dt.year

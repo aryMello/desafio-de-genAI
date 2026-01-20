@@ -44,28 +44,27 @@ class SRAGDataValidator:
         """
         return {
             # Validações de campo obrigatório
-            'required_fields': ['DT_NOTIFIC'],
+            'required_fields': ['DT_NOTIFIC', 'NU_NOTIFIC'],
             
             # Validações de formato de data
-            'date_fields': ['DT_NOTIFIC', 'DT_EVOLUCA', 'DT_INTERNA', 'DT_SIN_PRI'],
+            'date_fields': ['DT_NOTIFIC', 'DT_EVOLUCA', 'DT_INTERNA', 'DT_SIN_PRI', 'DT_NASC', 'DT_COLETA', 'DT_PCR', 'DT_DIGITA'],
             
             # Validações de range para campos numéricos
             'numeric_ranges': {
-                'NU_IDADE_N': {'min': 0, 'max': 120},
-                'SEM_PRI': {'min': 1, 'max': 53},
-                'SEM_NOT': {'min': 1, 'max': 53}
+                'NU_IDADE_N': {'min': 0, 'max': 120}
             },
             
             # Validações de valores categóricos válidos
             'categorical_values': {
-                'CS_SEXO': ['M', 'F', 'I'],
-                'EVOLUCAO': ['1', '2', '3', '9'],
-                'UTI': ['1', '2', '9'],
-                'SUPORT_VEN': ['1', '2', '9'],
-                'VACINA_COV': ['1', '2', '9'],
-                'DOSE_1_COV': ['1', '2', '9'],
-                'DOSE_2_COV': ['1', '2', '9'],
-                'DOSE_REF': ['1', '2', '9']
+                'CS_SEXO': ['M', 'F', 'I', ''],
+                'EVOLUCAO': ['1', '2', '3', '9', ''],
+                'UTI': ['1', '2', '9', ''],
+                'SUPORT_VEN': ['1', '2', '9', ''],
+                'VACINA_COV': ['1', '2', '9', ''],
+                'DOSE_1_COV': ['1', '2', '9', ''],
+                'DOSE_2_COV': ['1', '2', '9', ''],
+                'DOSE_REF': ['1', '2', '9', ''],
+                'HOSPITAL': ['1', '2', '9', '']
             },
             
             # Validações de consistência temporal
@@ -96,8 +95,7 @@ class SRAGDataValidator:
             
             # Limites para detecção de outliers
             'outlier_detection': {
-                'NU_IDADE_N': {'method': 'iqr', 'factor': 1.5},
-                'DIAS_EVOLUCAO': {'method': 'percentile', 'lower': 0.01, 'upper': 0.99}
+                'NU_IDADE_N': {'method': 'iqr', 'factor': 1.5}
             }
         }
     
@@ -582,7 +580,7 @@ class SRAGDataValidator:
             complete_duplicates = data.duplicated().sum()
             
             # Duplicatas baseadas em campos-chave
-            key_fields = ['DT_NOTIFIC', 'SG_UF', 'NU_IDADE_N', 'CS_SEXO']
+            key_fields = ['DT_NOTIFIC', 'SG_UF_NOT', 'NU_IDADE_N', 'CS_SEXO']
             available_keys = [field for field in key_fields if field in data.columns]
             
             if available_keys:

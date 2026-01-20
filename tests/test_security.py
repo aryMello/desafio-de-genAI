@@ -136,7 +136,7 @@ class TestSecurity:
         
         # Colunas que não devem ser detectadas como sensíveis
         non_sensitive_columns = [
-            'DT_NOTIFIC', 'SG_UF', 'NU_IDADE_N', 
+            'DT_NOTIFIC', 'SG_UF_NOT', 'NU_IDADE_N', 
             'CS_SEXO', 'EVOLUCAO'
         ]
         

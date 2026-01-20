@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 from datetime import datetime, timedelta
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, List, Optional, Tuple
 import numpy as np
 from pathlib import Path
 import warnings
@@ -35,21 +35,26 @@ class DatabaseTool(BaseTool):
         self.cache = {}
         self.last_load_time = None
         
+        # Auto-detect separator
+        self.separator = self._detect_separator()
+        
         # Definir colunas essenciais para análise SRAG
         self.essential_columns = [
             'DT_NOTIFIC',      # Data de notificação
-            'SG_UF',           # Estado
-            'ID_MUNICIP',      # Município
+            'SG_UF_NOT',       # Estado de notificação
+            'CO_MUN_NOT',      # Código do município
             'CS_SEXO',         # Sexo
             'NU_IDADE_N',      # Idade
             'UTI',             # Internação em UTI
             'SUPORT_VEN',      # Suporte ventilatório
             'EVOLUCAO',        # Evolução do caso
             'DT_EVOLUCA',      # Data da evolução
-            'VACINA_COV',      # Vacinação COVID
-            'DOSE_1_COV',      # 1ª dose
-            'DOSE_2_COV',      # 2ª dose
-            'DOSE_REF',        # Dose de reforço
+            'HOSPITAL',        # Internação hospitalar
+            'DT_INTERNA',      # Data de internação
+            'VACINA_COV',      # Vacinação COVID (código)
+            'DOSE_1_COV',      # 1ª dose COVID (DATA)
+            'DOSE_2_COV',      # 2ª dose COVID (DATA)
+            'DOSE_REF',        # Dose de reforço COVID (DATA)
             'FEBRE',           # Sintoma: febre
             'TOSSE',           # Sintoma: tosse
             'DISPNEIA',        # Sintoma: dispneia
@@ -59,7 +64,39 @@ class DatabaseTool(BaseTool):
             'VOMITO'           # Sintoma: vômito
         ]
         
-        logger.info("DatabaseTool inicializada")
+        logger.info(f"DatabaseTool inicializada - Separador: '{self.separator}'")
+    
+    def _detect_separator(self) -> str:
+        """
+        Auto-detecta o separador do arquivo CSV (comma ou semicolon).
+        
+        Returns:
+            String com o separador detectado (',' ou ';')
+        """
+        try:
+            if not os.path.exists(self.data_path):
+                logger.warning("Arquivo não encontrado, usando separador padrão ';'")
+                return ';'
+            
+            # Ler primeira linha
+            with open(self.data_path, 'r', encoding='utf-8') as f:
+                first_line = f.readline()
+            
+            # Contar ocorrências de cada separador potencial
+            comma_count = first_line.count(',')
+            semicolon_count = first_line.count(';')
+            
+            # Usar o que aparecer mais vezes
+            if semicolon_count > comma_count:
+                logger.info("Separador detectado: semicolon (;)")
+                return ';'
+            else:
+                logger.info("Separador detectado: comma (,)")
+                return ','
+                
+        except Exception as e:
+            logger.warning(f"Erro ao detectar separador: {e}. Usando padrão ';'")
+            return ';'
     
     async def load_srag_data(
         self, 
@@ -103,21 +140,33 @@ class DatabaseTool(BaseTool):
             logger.info(f"Lendo arquivo CSV: {self.data_path}")
             
             # Carregar em chunks para arquivos grandes
-            chunk_size = 10000
+            chunk_size = 50000
             chunks = []
+            max_chunks = 20  # Limit to ~1M rows for performance
+            chunk_count = 0
             
-            for chunk in pd.read_csv(
-                self.data_path,
-                encoding='utf-8',
-                sep=';',
-                chunksize=chunk_size,
-                low_memory=False,
-                usecols=self._get_available_columns()
-            ):
-                # Processar chunk
-                processed_chunk = self._process_chunk(chunk, start_date, end_date)
-                if not processed_chunk.empty:
-                    chunks.append(processed_chunk)
+            try:
+                for chunk in pd.read_csv(
+                    self.data_path,
+                    encoding='utf-8',
+                    sep=self.separator,
+                    chunksize=chunk_size,
+                    on_bad_lines='skip',
+                    engine='c',
+                    usecols=self._get_available_columns()
+                ):
+                    chunk_count += 1
+                    if chunk_count > max_chunks:
+                        logger.warning(f"Limite de chunks ({max_chunks}) atingido. Carregando {len(chunks)} chunks.")
+                        break
+                    
+                    # Processar chunk
+                    processed_chunk = self._process_chunk(chunk, start_date, end_date)
+                    if not processed_chunk.empty:
+                        chunks.append(processed_chunk)
+            except pd.errors.ParserError as e:
+                logger.warning(f"Erro de parsing ao carregar CSV (linhas mal formatadas serão ignoradas): {e}")
+                pass
             
             # Concatenar todos os chunks
             if chunks:
@@ -153,8 +202,10 @@ class DatabaseTool(BaseTool):
             sample = pd.read_csv(
                 self.data_path,
                 encoding='utf-8',
-                sep=';',
-                nrows=0
+                sep=self.separator,
+                nrows=0,
+                on_bad_lines='skip',
+                engine='python'
             )
             
             available_cols = []
@@ -189,15 +240,11 @@ class DatabaseTool(BaseTool):
             DataFrame processado
         """
         try:
-            # Converter datas
+            # Parse all dates first
+            chunk = self._parse_all_dates(chunk)
+            
+            # Filtrar por período usando DT_NOTIFIC
             if 'DT_NOTIFIC' in chunk.columns:
-                chunk['DT_NOTIFIC'] = pd.to_datetime(
-                    chunk['DT_NOTIFIC'], 
-                    format='%Y-%m-%d',
-                    errors='coerce'
-                )
-                
-                # Filtrar por período
                 start_dt = datetime.strptime(start_date, '%Y-%m-%d')
                 end_dt = datetime.strptime(end_date, '%Y-%m-%d')
                 
@@ -213,24 +260,87 @@ class DatabaseTool(BaseTool):
             logger.warning(f"Erro no processamento de chunk: {e}")
             return pd.DataFrame()
     
+    def _parse_all_dates(self, data: pd.DataFrame) -> pd.DataFrame:
+        """
+        Parse all date fields with correct formats.
+        
+        CRITICAL FIX: SRAG data has TWO different date formats:
+        - ISO format (YYYY-MM-DD): Most dates like DT_NOTIFIC, DT_EVOLUCA
+        - Brazilian format (DD/MM/YYYY): COVID vaccination dose dates
+        """
+        # ISO format dates (YYYY-MM-DD)
+        iso_date_fields = [
+            'DT_NOTIFIC', 'DT_SIN_PRI', 'DT_NASC', 'DT_EVOLUCA', 
+            'DT_ENCERRA', 'DT_DIGITA', 'DT_INTERNA', 'DT_COLETA',
+            'DT_PCR', 'DT_ENTUTI', 'DT_SAIDUTI', 'DT_RAIOX',
+            'DT_ANTIVIR', 'DT_TOMO', 'DT_CO_SOR', 'DT_RES',
+            'DT_TRT_COV', 'VG_DTRES', 'DT_UT_DOSE', 'DT_VAC_MAE'
+        ]
+        
+        # Brazilian format dates (DD/MM/YYYY) - COVID vaccination doses
+        brazilian_date_fields = [
+            'DOSE_1_COV', 'DOSE_2_COV', 'DOSE_REF', 
+            'DOSE_2REF', 'DOSE_ADIC', 'DOS_RE_BI',
+            'DT_DOSEUNI', 'DT_1_DOSE', 'DT_2_DOSE'
+        ]
+        
+        # Parse ISO dates
+        for col in iso_date_fields:
+            if col in data.columns:
+                data[col] = pd.to_datetime(
+                    data[col], 
+                    format='%Y-%m-%d',
+                    errors='coerce'
+                )
+        
+        # Parse Brazilian format dates
+        for col in brazilian_date_fields:
+            if col in data.columns:
+                data[col] = pd.to_datetime(
+                    data[col],
+                    format='%d/%m/%Y',  # CRITICAL FIX
+                    errors='coerce'
+                )
+                
+                # Log parsing results for debugging
+                if col in ['DOSE_1_COV', 'DOSE_2_COV', 'DOSE_REF']:
+                    valid_count = data[col].notna().sum()
+                    if valid_count > 0:
+                        logger.debug(f"{col}: {valid_count} valid dates parsed")
+        
+        return data
+    
     def _basic_cleaning(self, data: pd.DataFrame) -> pd.DataFrame:
         """
-        Aplica limpeza básica nos dados.
+        Aplica limpeza básica nos dados com tipos padronizados.
         """
         try:
             # Remover registros com data de notificação inválida
             if 'DT_NOTIFIC' in data.columns:
                 data = data.dropna(subset=['DT_NOTIFIC'])
             
-            # Padronizar valores categóricos SEM substituir valores
-            categorical_columns = ['CS_SEXO', 'SG_UF', 'UTI', 'EVOLUCAO', 'VACINA_COV']
+            # Padronizar valores categóricos
+            categorical_columns = {
+                'CS_SEXO': ['M', 'F', 'I'],
+                'EVOLUCAO': ['1', '2', '3', '9'],
+                'UTI': ['1', '2', '9'],
+                'SUPORT_VEN': ['1', '2', '9'],
+                'VACINA_COV': ['1', '2', '9'],
+                'HOSPITAL': ['1', '2', '9']
+            }
             
-            for col in categorical_columns:
+            for col, valid_values in categorical_columns.items():
                 if col in data.columns:
-                    # Apenas converter para string e limpar espaços
-                    data[col] = data[col].astype(str).str.strip()
-                    # Substituir apenas valores vazios
-                    data[col] = data[col].replace(['nan', 'NaN', 'NAN', ''], np.nan)
+                    # Converter para string, remover .0, strip
+                    data[col] = (data[col]
+                                .astype(str)
+                                .str.replace('.0', '', regex=False)
+                                .str.strip())
+                    
+                    # Substituir valores inválidos por NaN
+                    data[col] = data[col].apply(
+                        lambda x: x if x in valid_values + ['nan', 'NaN', ''] else np.nan
+                    )
             
             # Limpar idade
             if 'NU_IDADE_N' in data.columns:
@@ -240,24 +350,24 @@ class DatabaseTool(BaseTool):
                     'NU_IDADE_N'
                 ] = np.nan
             
-            # Converter campos numéricos sem filtrar
-            numeric_fields = [
-                'UTI', 'SUPORT_VEN', 'FEBRE', 'TOSSE', 'DISPNEIA', 
-                'DESC_RESP', 'SATURACAO', 'DIARREIA', 'VOMITO'
+            # Converter campos de sintomas para numérico
+            symptom_fields = [
+                'FEBRE', 'TOSSE', 'DISPNEIA', 'DESC_RESP', 
+                'SATURACAO', 'DIARREIA', 'VOMITO'
             ]
             
-            for col in numeric_fields:
+            for col in symptom_fields:
                 if col in data.columns:
                     data[col] = pd.to_numeric(data[col], errors='coerce')
             
-            # DIAGNÓSTICO: Log dos valores encontrados
+            # Log diagnóstico
             if 'EVOLUCAO' in data.columns:
                 evolucao_counts = data['EVOLUCAO'].value_counts(dropna=False).head(10)
-                logger.info(f"Valores EVOLUCAO encontrados: {evolucao_counts.to_dict()}")
+                logger.debug(f"Valores EVOLUCAO: {evolucao_counts.to_dict()}")
             
             if 'UTI' in data.columns:
                 uti_counts = data['UTI'].value_counts(dropna=False).head(10)
-                logger.info(f"Valores UTI encontrados: {uti_counts.to_dict()}")
+                logger.debug(f"Valores UTI: {uti_counts.to_dict()}")
             
             return data
             
@@ -280,6 +390,9 @@ class DatabaseTool(BaseTool):
             
             data = raw_data.copy()
             
+            # Ensure dates are parsed
+            data = self._parse_all_dates(data)
+            
             # Criar campos derivados
             data = self._create_derived_fields(data)
             
@@ -300,12 +413,6 @@ class DatabaseTool(BaseTool):
     def _create_derived_fields(self, data: pd.DataFrame) -> pd.DataFrame:
         """
         Cria campos derivados para análise.
-        
-        Args:
-            data: DataFrame original
-            
-        Returns:
-            DataFrame com campos derivados
         """
         try:
             # Campo de faixa etária
@@ -318,59 +425,27 @@ class DatabaseTool(BaseTool):
                 )
             
             # Campo de evolução simplificada
-            # Aceitar string ou numérico
             if 'EVOLUCAO' in data.columns:
-                # Converter para string para comparação
-                evolucao_str = data['EVOLUCAO'].astype(str).str.strip()
-                
                 data['EVOLUCAO_SIMPLES'] = 'Ignorado'
-                data.loc[evolucao_str == '1', 'EVOLUCAO_SIMPLES'] = 'Cura'
-                data.loc[evolucao_str == '2', 'EVOLUCAO_SIMPLES'] = 'Óbito'
-                data.loc[evolucao_str == '3', 'EVOLUCAO_SIMPLES'] = 'Óbito por outras causas'
+                data.loc[data['EVOLUCAO'] == '1', 'EVOLUCAO_SIMPLES'] = 'Cura'
+                data.loc[data['EVOLUCAO'] == '2', 'EVOLUCAO_SIMPLES'] = 'Óbito'
+                data.loc[data['EVOLUCAO'] == '3', 'EVOLUCAO_SIMPLES'] = 'Óbito por outras causas'
                 
-                logger.info(f"Distribuição EVOLUCAO_SIMPLES: {data['EVOLUCAO_SIMPLES'].value_counts().to_dict()}")
+                logger.debug(f"Distribuição EVOLUCAO_SIMPLES: {data['EVOLUCAO_SIMPLES'].value_counts().to_dict()}")
             
-            # Campo de gravidade baseado em UTI e suporte ventilatório
-            # Aceitar tanto 1 quanto '1'
+            # Campo de gravidade baseado em UTI
             if 'UTI' in data.columns:
-                uti_values = pd.to_numeric(data['UTI'], errors='coerce')
-                data['CASO_GRAVE'] = (uti_values == 1).astype(int)
-                logger.info(f"Casos graves (UTI=1): {data['CASO_GRAVE'].sum()}")
+                data['CASO_GRAVE'] = (data['UTI'] == '1').astype(int)
+                logger.debug(f"Casos graves (UTI=1): {data['CASO_GRAVE'].sum()}")
             
-            # Campo de status vacinal consolidado
-            # Verificar múltiplos valores possíveis
-            if 'VACINA_COV' in data.columns or any(col in data.columns for col in ['DOSE_1_COV', 'DOSE_2_COV']):
-                data['STATUS_VACINAL'] = 'Não informado'
-                
-                # Se tem campo VACINA_COV
-                if 'VACINA_COV' in data.columns:
-                    vacina_str = data['VACINA_COV'].astype(str).str.strip()
-                    data.loc[vacina_str == '2', 'STATUS_VACINAL'] = 'Não vacinado'
-                    data.loc[vacina_str == '1', 'STATUS_VACINAL'] = 'Vacinado'
-                
-                # Se tem campos de dose
-                if 'DOSE_1_COV' in data.columns:
-                    dose1 = pd.to_numeric(data['DOSE_1_COV'], errors='coerce')
-                    data.loc[dose1 == 1, 'STATUS_VACINAL'] = '1ª dose'
-                
-                if 'DOSE_2_COV' in data.columns:
-                    dose2 = pd.to_numeric(data['DOSE_2_COV'], errors='coerce')
-                    data.loc[dose2 == 1, 'STATUS_VACINAL'] = '2ª dose'
-                
-                if 'DOSE_REF' in data.columns:
-                    dose_ref = pd.to_numeric(data['DOSE_REF'], errors='coerce')
-                    data.loc[dose_ref == 1, 'STATUS_VACINAL'] = 'Dose reforço'
-                
-                logger.info(f"Distribuição STATUS_VACINAL: {data['STATUS_VACINAL'].value_counts().to_dict()}")
+            # Campo de status vacinal COVID baseado em DATAS de dose
+            data = self._create_vaccination_status_field(data)
             
             # Campo de número de sintomas
             symptom_cols = ['FEBRE', 'TOSSE', 'DISPNEIA', 'DESC_RESP', 'DIARREIA', 'VOMITO']
             available_symptoms = [col for col in symptom_cols if col in data.columns]
             
             if available_symptoms:
-                # Converter para numérico
-                for col in available_symptoms:
-                    data[col] = pd.to_numeric(data[col], errors='coerce')
                 data['NUM_SINTOMAS'] = data[available_symptoms].eq(1).sum(axis=1)
             
             # Campo de semana epidemiológica
@@ -385,15 +460,58 @@ class DatabaseTool(BaseTool):
             logger.error(f"Erro ao criar campos derivados: {e}", exc_info=True)
             return data
     
+    def _create_vaccination_status_field(self, data: pd.DataFrame) -> pd.DataFrame:
+        """
+        Create vaccination status field based on DOSE DATES, not VACINA_COV code.
+        
+        CRITICAL FIX: VACINA_COV is unreliable for COVID vaccination status.
+        Use actual dose dates instead.
+        """
+        data['STATUS_VACINAL_COVID'] = 'Não informado'
+        
+        dose_cols = ['DOSE_1_COV', 'DOSE_2_COV', 'DOSE_REF', 'DOSE_2REF', 'DOSE_ADIC']
+        available_doses = [col for col in dose_cols if col in data.columns]
+        
+        if not available_doses:
+            logger.warning("No COVID dose date columns available")
+            return data
+        
+        # Not vaccinated = no dose dates at all
+        has_any_dose = data[available_doses].notna().any(axis=1)
+        data.loc[~has_any_dose, 'STATUS_VACINAL_COVID'] = 'Não vacinado'
+        
+        # Has first dose
+        if 'DOSE_1_COV' in data.columns:
+            has_dose1 = data['DOSE_1_COV'].notna()
+            data.loc[has_dose1 & ~data[['DOSE_2_COV']].notna().any(axis=1) if 'DOSE_2_COV' in data.columns else has_dose1, 
+                    'STATUS_VACINAL_COVID'] = '1ª dose apenas'
+        
+        # Has second dose
+        if 'DOSE_2_COV' in data.columns:
+            has_dose2 = data['DOSE_2_COV'].notna()
+            no_booster = ~data[['DOSE_REF', 'DOSE_2REF', 'DOSE_ADIC']].notna().any(axis=1) if any(c in data.columns for c in ['DOSE_REF', 'DOSE_2REF', 'DOSE_ADIC']) else True
+            data.loc[has_dose2 & no_booster, 'STATUS_VACINAL_COVID'] = 'Esquema completo (2 doses)'
+        
+        # Has booster
+        if 'DOSE_REF' in data.columns:
+            has_booster = data['DOSE_REF'].notna()
+            no_second_booster = ~data[['DOSE_2REF', 'DOSE_ADIC']].notna().any(axis=1) if any(c in data.columns for c in ['DOSE_2REF', 'DOSE_ADIC']) else True
+            data.loc[has_booster & no_second_booster, 'STATUS_VACINAL_COVID'] = 'Com dose de reforço'
+        
+        # Has 2nd booster or additional
+        if 'DOSE_2REF' in data.columns or 'DOSE_ADIC' in data.columns:
+            has_extra = data[['DOSE_2REF', 'DOSE_ADIC']].notna().any(axis=1) if all(c in data.columns for c in ['DOSE_2REF', 'DOSE_ADIC']) else (
+                data['DOSE_2REF'].notna() if 'DOSE_2REF' in data.columns else data['DOSE_ADIC'].notna()
+            )
+            data.loc[has_extra, 'STATUS_VACINAL_COVID'] = 'Com reforços adicionais'
+        
+        logger.info(f"Distribuição STATUS_VACINAL_COVID: {data['STATUS_VACINAL_COVID'].value_counts().to_dict()}")
+        
+        return data
+    
     def _apply_classifications(self, data: pd.DataFrame) -> pd.DataFrame:
         """
         Aplica classificações padronizadas aos dados.
-        
-        Args:
-            data: DataFrame com dados
-            
-        Returns:
-            DataFrame com classificações aplicadas
         """
         try:
             # Classificação de risco por idade
@@ -404,15 +522,13 @@ class DatabaseTool(BaseTool):
             
             # Classificação de evolução
             if 'EVOLUCAO' in data.columns:
-                evolucao_str = data['EVOLUCAO'].astype(str).str.strip()
-                data['TEVE_OBITO'] = evolucao_str.isin(['2', '3']).astype(int)
-                logger.info(f"Total de óbitos identificados: {data['TEVE_OBITO'].sum()}")
+                data['TEVE_OBITO'] = data['EVOLUCAO'].isin(['2', '3']).astype(int)
+                logger.debug(f"Total de óbitos identificados: {data['TEVE_OBITO'].sum()}")
             
             # Classificação de internação
             if 'UTI' in data.columns:
-                uti_numeric = pd.to_numeric(data['UTI'], errors='coerce')
-                data['TEVE_UTI'] = (uti_numeric == 1).astype(int)
-                logger.info(f"Total de internações em UTI: {data['TEVE_UTI'].sum()}")
+                data['TEVE_UTI'] = (data['UTI'] == '1').astype(int)
+                logger.debug(f"Total de internações em UTI: {data['TEVE_UTI'].sum()}")
             
             return data
             
@@ -423,12 +539,6 @@ class DatabaseTool(BaseTool):
     def _validate_data_integrity(self, data: pd.DataFrame) -> pd.DataFrame:
         """
         Valida integridade dos dados e remove registros inconsistentes.
-        
-        Args:
-            data: DataFrame a ser validado
-            
-        Returns:
-            DataFrame validado
         """
         try:
             initial_count = len(data)
@@ -440,13 +550,13 @@ class DatabaseTool(BaseTool):
             # Validar consistência de datas
             if 'DT_EVOLUCA' in data.columns and 'DT_NOTIFIC' in data.columns:
                 # Data de evolução não pode ser anterior à notificação
-                mask = data['DT_EVOLUCA'] >= data['DT_NOTIFIC']
-                data = data[mask | data['DT_EVOLUCA'].isna()]
+                mask = (data['DT_EVOLUCA'] >= data['DT_NOTIFIC']) | data['DT_EVOLUCA'].isna()
+                data = data[mask]
             
             # Remover duplicatas baseadas em critérios específicos
-            if all(col in data.columns for col in ['DT_NOTIFIC', 'ID_MUNICIP', 'NU_IDADE_N']):
+            if all(col in data.columns for col in ['DT_NOTIFIC', 'CO_MUN_NOT', 'NU_IDADE_N']):
                 data = data.drop_duplicates(
-                    subset=['DT_NOTIFIC', 'ID_MUNICIP', 'NU_IDADE_N', 'CS_SEXO'],
+                    subset=['DT_NOTIFIC', 'CO_MUN_NOT', 'NU_IDADE_N', 'CS_SEXO'],
                     keep='first'
                 )
             
@@ -465,12 +575,6 @@ class DatabaseTool(BaseTool):
     def get_data_summary(self, data: pd.DataFrame) -> Dict[str, Any]:
         """
         Gera resumo estatístico dos dados carregados.
-        
-        Args:
-            data: DataFrame com dados
-            
-        Returns:
-            Dict com estatísticas resumidas
         """
         try:
             summary = {
@@ -512,13 +616,18 @@ class DatabaseTool(BaseTool):
                         'max': int(age_data.max())
                     }
             
-            if 'SG_UF' in data.columns:
-                uf_counts = data['SG_UF'].value_counts().head(5)
+            if 'SG_UF_NOT' in data.columns:
+                uf_counts = data['SG_UF_NOT'].value_counts().head(5)
                 summary['statistics']['top_states'] = uf_counts.to_dict()
             
             if 'EVOLUCAO' in data.columns:
                 evolucao_counts = data['EVOLUCAO'].value_counts()
                 summary['statistics']['evolution'] = evolucao_counts.to_dict()
+            
+            # Vaccination statistics
+            if 'STATUS_VACINAL_COVID' in data.columns:
+                vac_counts = data['STATUS_VACINAL_COVID'].value_counts()
+                summary['statistics']['vaccination_status'] = vac_counts.to_dict()
             
             return summary
             
@@ -529,9 +638,6 @@ class DatabaseTool(BaseTool):
     def health_check(self) -> Dict[str, Any]:
         """
         Verifica saúde da ferramenta de banco de dados.
-        
-        Returns:
-            Dict com status de saúde
         """
         try:
             status = {
@@ -564,7 +670,7 @@ class DatabaseTool(BaseTool):
                     test_data = pd.read_csv(
                         self.data_path,
                         encoding='utf-8',
-                        sep=';',
+                        sep=self.separator,
                         nrows=5
                     )
                     status['data_file']['readable'] = True
@@ -591,9 +697,6 @@ class DatabaseTool(BaseTool):
     def get_cache_stats(self) -> Dict[str, Any]:
         """
         Retorna estatísticas do cache.
-        
-        Returns:
-            Dict com estatísticas do cache
         """
         stats = {
             'entries': len(self.cache),
@@ -614,4 +717,3 @@ class DatabaseTool(BaseTool):
             logger.error(f"Erro ao calcular estatísticas do cache: {e}")
         
         return stats
-        

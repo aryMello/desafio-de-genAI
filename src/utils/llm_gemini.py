@@ -2,6 +2,10 @@
 Módulo de integração com Google Gemini LLM
 """
 
+import warnings
+# Suppress the FutureWarning about deprecated google.generativeai package
+warnings.filterwarnings('ignore', category=FutureWarning, module='google.generativeai')
+
 import google.generativeai as genai
 from typing import Optional, Dict, Any, List
 import asyncio
@@ -27,7 +31,7 @@ class GeminiLLM:
         """Inicializa cliente Gemini com configurações."""
         self.config = Config()
         self.api_key = self.config.get('GEMINI_API_KEY')
-        self.model_name = self.config.get('GEMINI_MODEL', 'gemini-2.5-pro')
+        self.model_name = self.config.get('GEMINI_MODEL', 'gemini-2.5-flash')
         self.temperature = self.config.get('GEMINI_TEMPERATURE', 0.7)
         self.max_tokens = self.config.get('GEMINI_MAX_TOKENS', 2048)
         

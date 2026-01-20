@@ -26,25 +26,37 @@ def sample_srag_data():
     dates = [start_date + timedelta(days=np.random.randint(0, 730)) for _ in range(n_records)]
     
     data = {
+        'NU_NOTIFIC': [str(i) for i in range(n_records)],
         'DT_NOTIFIC': [d.strftime('%d/%m/%Y') for d in dates],
-        'SG_UF': np.random.choice(['SP', 'RJ', 'MG', 'PR', 'RS'], n_records),
-        'ID_MUNICIP': np.random.randint(100000, 999999, n_records),
+        'SG_UF_NOT': np.random.choice(['SP', 'RJ', 'MG', 'PR', 'RS'], n_records),
+        'CO_MUN_NOT': np.random.randint(100000, 999999, n_records),
         'CS_SEXO': np.random.choice(['M', 'F', 'I'], n_records, p=[0.48, 0.50, 0.02]),
         'NU_IDADE_N': np.random.gamma(2, 30, n_records).astype(int),  # Distribuição realista de idades
+        'DT_NASC': [d.strftime('%d/%m/%Y') for d in dates],
         'UTI': np.random.choice(['1', '2', '9'], n_records, p=[0.25, 0.70, 0.05]),
         'SUPORT_VEN': np.random.choice(['1', '2', '9'], n_records, p=[0.15, 0.80, 0.05]),
+        'HOSPITAL': np.random.choice(['1', '2', '9'], n_records, p=[0.20, 0.75, 0.05]),
+        'DT_INTERNA': [d.strftime('%d/%m/%Y') for d in dates],
         'EVOLUCAO': np.random.choice(['1', '2', '3', '9'], n_records, p=[0.75, 0.15, 0.05, 0.05]),
+        'DT_EVOLUCA': [d.strftime('%d/%m/%Y') for d in dates],
         'VACINA_COV': np.random.choice(['1', '2', '9'], n_records, p=[0.70, 0.25, 0.05]),
         'DOSE_1_COV': np.random.choice(['1', '2', '9'], n_records, p=[0.85, 0.10, 0.05]),
         'DOSE_2_COV': np.random.choice(['1', '2', '9'], n_records, p=[0.75, 0.20, 0.05]),
         'DOSE_REF': np.random.choice(['1', '2', '9'], n_records, p=[0.60, 0.35, 0.05]),
         'FEBRE': np.random.choice(['1', '2', '9'], n_records, p=[0.80, 0.15, 0.05]),
         'TOSSE': np.random.choice(['1', '2', '9'], n_records, p=[0.75, 0.20, 0.05]),
+        'GARGANTA': np.random.choice(['1', '2', '9'], n_records, p=[0.40, 0.55, 0.05]),
         'DISPNEIA': np.random.choice(['1', '2', '9'], n_records, p=[0.60, 0.35, 0.05]),
         'DESC_RESP': np.random.choice(['1', '2', '9'], n_records, p=[0.55, 0.40, 0.05]),
         'SATURACAO': np.random.choice(['1', '2', '9'], n_records, p=[0.45, 0.50, 0.05]),
         'DIARREIA': np.random.choice(['1', '2', '9'], n_records, p=[0.30, 0.65, 0.05]),
-        'VOMITO': np.random.choice(['1', '2', '9'], n_records, p=[0.25, 0.70, 0.05])
+        'VOMITO': np.random.choice(['1', '2', '9'], n_records, p=[0.25, 0.70, 0.05]),
+        'DT_COLETA': [d.strftime('%d/%m/%Y') for d in dates],
+        'PCR_RESUL': np.random.choice(['1', '2', '9'], n_records, p=[0.20, 0.70, 0.10]),
+        'DT_PCR': [d.strftime('%d/%m/%Y') for d in dates],
+        'CLASSI_FIN': np.random.choice(['1', '2', '3', '4', '5'], n_records, p=[0.60, 0.10, 0.05, 0.15, 0.10]),
+        'CRITERIO': np.random.choice(['1', '2', '3', '9'], n_records, p=[0.50, 0.30, 0.15, 0.05]),
+        'DT_DIGITA': [d.strftime('%d/%m/%Y') for d in dates]
     }
     
     df = pd.DataFrame(data)
