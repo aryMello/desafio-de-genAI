@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Large data files
+data/raw/srag_data.csv
+
 # C extensions
 *.so
 
@@ -123,11 +126,8 @@ dmypy.json
 .pyre/
 
 # Arquivos específicos do projeto
-data/raw/*.csv
 data/processed/*.parquet
-data/reports/*.html
-data/reports/*.png
-data/reports/*.svg
+data/raw/*.csv
 data/cache/
 logs/*.log
 *.log
