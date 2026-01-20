@@ -44,7 +44,7 @@ O sistema consulta dados do DataSUS, calcula métricas epidemiológicas e incorp
 - Python 3.9+
 - pip ou conda
 - Git
-- Chave da API OpenAI (para LLM) e News API (para as noticias)
+- Chave da API Google Gemini (para análise com LLM) e News API (para notícias)
 
 ### Instalação
 
@@ -68,8 +68,11 @@ cp .env.example .env
 ### Configuração do .env
 
 ```bash
-# API Keys
-OPENAI_API_KEY=sua_chave_openai_aqui
+# Google Gemini API (LLM para análise aprimorada)
+GEMINI_API_KEY=sua_chave_gemini_aqui
+GEMINI_MODEL=gemini-2.5-pro
+GEMINI_TEMPERATURE=0.7
+GEMINI_MAX_TOKENS=2048
 
 # News API
 NEWS_API_KEY=sua_chave_news_api
@@ -85,6 +88,19 @@ LOG_FILE=logs/srag_system.log
 CACHE_TTL=3600
 REDIS_URL=redis://localhost:6379
 ```
+
+### Como Obter Chaves de API
+
+#### Google Gemini API
+1. Acesse [Google AI Studio](https://makersuite.google.com/app/apikey)
+2. Clique em "Create API Key"
+3. Copie a chave e adicione ao `.env` como `GEMINI_API_KEY`
+4. **Nota**: Gemini Pro é gratuito com limites mensais generosos
+
+#### News API
+1. Acesse [News API](https://newsapi.org/)
+2. Registre-se para obter uma chave gratuita
+3. Adicione ao `.env` como `NEWS_API_KEY`
 
 ### Download dos Dados SRAG
 
@@ -136,6 +152,47 @@ async def generate_custom_report():
 report = asyncio.run(generate_custom_report())
 ```
 
+## Arquitetura e Integração com Gemini
+
+### Componentes Principais
+
+Este sistema utiliza **Google Gemini LLM** para análise avançada de dados epidemiológicos:
+
+#### 1. **Análise de Notícias com Gemini** (`src/tools/news_tool.py`)
+   - Coleta notícias de múltiplas fontes (RSS feeds e News API)
+   - Utiliza Gemini para análise contextualizada em linguagem natural
+   - Correlaciona notícias com métricas de SRAG
+   - Gera explicações compreensíveis do cenário epidemiológico
+
+#### 2. **Geração de Relatório Aprimorado** (`src/tools/report_tool.py`)
+   - Gera resumos executivos com Gemini
+   - Cria explicações das métricas em linguagem natural
+   - Produz insights consolidados sobre a situação
+
+#### 3. **Módulo Gemini** (`src/utils/llm_gemini.py`)
+   - Wrapper para Google Generative AI API
+   - Suporta fallback automático para análise heurística
+   - Configurável via variáveis de ambiente
+
+### Fluxo de Processamento com Gemini
+
+```
+Dados SRAG → Métricas Calculadas → Notícias Buscadas
+     ↓              ↓                    ↓
+     └─→ Análise com Gemini ←─────────────┘
+                    ↓
+          Explicações e Insights
+                    ↓
+          Relatório Consolidado
+```
+
+### Fallback Inteligente
+
+Caso o Gemini não esteja disponível:
+- Sistema automático cai para análise baseada em regras heurísticas
+- Garante funcionamento mesmo sem LLM
+- Registra tentativas e erros para debugging
+
 ## Estrutura do Projeto
 
 ```
@@ -146,13 +203,14 @@ desafio-de-genAI/
 │   │   └── base_agent.py        # Classe base
 │   ├── tools/                # Ferramentas específicas
 │   │   ├── database_tool.py     # Acesso a dados
-│   │   ├── news_tool.py         # Busca de notícias
+│   │   ├── news_tool.py         # Busca de notícias + Gemini
 │   │   ├── metrics_tool.py      # Cálculo de métricas
 │   │   ├── chart_tool.py        # Geração de gráficos
-│   │   └── report_tool.py       # Compilação final
+│   │   └── report_tool.py       # Compilação final + Gemini
 │   ├── utils/                # Utilitários
 │   │   ├── logger.py            # Sistema de logs
 │   │   ├── config.py            # Configurações
+│   │   ├── llm_gemini.py        # Integração Google Gemini
 │   │   └── guardrails.py        # Sistema de proteção
 │   └── config/               # Arquivos de configuração
 ├── data/                     # Diretório de dados
@@ -161,11 +219,9 @@ desafio-de-genAI/
 │   └── reports/              # Relatórios gerados
 ├── assets/                   # Arquivos de midia
 ├── logs/                     # Arquivos de log
-├── assets/                   # Arquivos de imagem
 ├── tests/                    # Testes automatizados
 ├── docs/                     # Documentação
-├── main.py                   # Ponto de entrada
-├── requirements.txt          # Dependências
+├── requirements.txt          # Dependências (com google-generativeai)
 ├── LICENSE                   # Licença
 └── README.md                 # Este arquivo
 ```

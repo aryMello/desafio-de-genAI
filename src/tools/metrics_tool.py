@@ -233,7 +233,6 @@ class MetricsCalculatorTool(BaseTool):
             elif 'CLASSI_FIN' in period_data.columns:
                 # Classificação final - códigos de óbito podem variar
                 logger.info("Tentando calcular via CLASSI_FIN")
-                # Adicionar lógica específica se souber os códigos
             
             else:
                 logger.warning("Nenhuma coluna de evolução/óbito encontrada nos dados")

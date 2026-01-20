@@ -220,4 +220,89 @@ class SRAGDataProcessor:
             Chunk pré-processado
         """
 
-        #TO DO 
+        # Renomear colunas conforme mapeamento
+        chunk.rename(columns=SRAG_COLUMNS_MAPPING, inplace=True)
+        
+        # Converter datas para datetime
+        date_columns = [
+            'data_notificacao', 'data_inicio_sintomas', 'data_internacao',
+            'data_obito', 'data_coleta', 'data_digita', 'data_antiviral'
+        ]
+        
+        for col in date_columns:
+            if col in chunk.columns:
+                chunk[col] = pd.to_datetime(chunk[col], errors='coerce', format='%Y-%m-%d')
+        
+        return chunk
+
+    def _filter_by_date_range(
+        self, 
+        data: pd.DataFrame, 
+        start_date: Optional[str], 
+        end_date: Optional[str]
+    ) -> pd.DataFrame:
+        """
+        Filtra dados por intervalo de datas.
+        
+        Args:
+            data: DataFrame com dados
+            start_date: Data de início (YYYY-MM-DD)
+            end_date: Data de fim (YYYY-MM-DD)
+            
+        Returns:
+            DataFrame filtrado
+        """
+        if start_date:
+            start_dt = pd.to_datetime(start_date)
+            data = data[data['data_notificacao'] >= start_dt]
+        
+        if end_date:
+            end_dt = pd.to_datetime(end_date)
+            data = data[data['data_notificacao'] <= end_dt]
+        
+        logger.info(f"Dados filtrados por intervalo de datas: {len(data)} registros restantes")
+        return data
+
+    def _process_data_pipeline(self, data: pd.DataFrame) -> pd.DataFrame:
+        """
+        Aplica o pipeline completo de processamento de dados.
+        
+        Args:
+            data: DataFrame com dados brutos
+            
+        Returns:
+            DataFrame com dados processados
+        """
+        # Exemplo de etapas de processamento adicionais
+        data = self._create_derived_fields(data)
+        data = self.validator.validate(data)
+        
+        return data
+
+    def _create_derived_fields(self, data: pd.DataFrame) -> pd.DataFrame:
+        """
+        Cria campos derivados necessários.
+        
+        Args:
+            data: DataFrame com dados
+            
+        Returns:
+            DataFrame com campos derivados
+        """
+        # Exemplo: calcular idade em anos a partir da data de nascimento
+        if 'data_nascimento' in data.columns:
+            data['idade'] = (pd.to_datetime('today') - data['data_nascimento']).dt.days // 365
+        
+        logger.info("Campos derivados criados")
+        return data
+
+    def get_processing_stats(self) -> Dict[str, Any]:
+        """
+        Retorna estatísticas do processamento.
+        
+        Returns:
+            Dicionário com estatísticas
+        """
+        return self.processing_stats
+
+

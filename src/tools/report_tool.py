@@ -8,6 +8,7 @@ import base64
 
 from .base_tool import BaseTool
 from ..utils.logger import get_logger
+from ..utils.llm_gemini import get_gemini_client
 
 logger = get_logger(__name__)
 
@@ -131,7 +132,7 @@ class ReportGeneratorTool(BaseTool):
                 'report_info': report_info
             }
 
-            # Converter timestamps para strings (adicione esta linha)
+            # Converter timestamps para strings
             result = self._convert_timestamps_to_str(result)
 
             return result
@@ -239,22 +240,22 @@ class ReportGeneratorTool(BaseTool):
         metrics_html = """
         <div class="section">
             <div class="container">
-                <h3 class="section-title">📊 Métricas Principais</h3>
+                <h3 class="section-title">Métricas Principais</h3>
                 <div class="row">
         """
         
         # Mapear nomes das métricas para exibição
         metric_names = {
-            'case_increase_rate': ('Taxa de Aumento de Casos', '📈', 'primary'),
-            'mortality_rate': ('Taxa de Mortalidade', '💀', 'danger'),
-            'icu_occupancy_rate': ('Taxa de Ocupação UTI', '🏥', 'warning'),
-            'vaccination_rate': ('Taxa de Vacinação', '💉', 'success')
+            'case_increase_rate': ('Taxa de Aumento de Casos', 'primary'),
+            'mortality_rate': ('Taxa de Mortalidade', 'danger'),
+            'icu_occupancy_rate': ('Taxa de Ocupação UTI', 'warning'),
+            'vaccination_rate': ('Taxa de Vacinação', 'success')
         }
         
         for metric_key, metric_data in metrics.items():
             if isinstance(metric_data, dict) and 'rate' in metric_data:
                 if metric_key in metric_names:
-                    name, icon, color = metric_names[metric_key]
+                    name, color = metric_names[metric_key]
                     rate = metric_data.get('rate', 0)
                     interpretation = metric_data.get('interpretation', '')
                     
@@ -262,7 +263,6 @@ class ReportGeneratorTool(BaseTool):
                     <div class="col-md-6 col-lg-3 mb-4">
                         <div class="metric-card card border-{color}">
                             <div class="card-body text-center">
-                                <div class="metric-icon">{icon}</div>
                                 <h4 class="metric-name">{name}</h4>
                                 <div class="metric-value text-{color}">{rate}%</div>
                                 <p class="metric-interpretation">{interpretation}</p>
@@ -285,7 +285,7 @@ class ReportGeneratorTool(BaseTool):
             return """
             <div class="section">
                 <div class="container">
-                    <h3 class="section-title">📈 Gráficos</h3>
+                    <h3 class="section-title">Gráficos</h3>
                     <div class="alert alert-info">
                         Gráficos não disponíveis neste relatório.
                     </div>
@@ -296,7 +296,7 @@ class ReportGeneratorTool(BaseTool):
         charts_html = """
         <div class="section">
             <div class="container">
-                <h3 class="section-title">📈 Visualizações</h3>
+                <h3 class="section-title">Visualizações</h3>
                 <div class="row">
         """
         
@@ -312,7 +312,7 @@ class ReportGeneratorTool(BaseTool):
             <div class="col-md-6 mb-4">
                 <div class="card">
                     <div class="card-header">
-                        <h5>📅 Casos Diários (Últimos 30 dias)</h5>
+                        <h5>Casos Diários (Últimos 30 dias)</h5>
                     </div>
                     <div class="card-body">
                         <div class="chart-info">
@@ -340,7 +340,7 @@ class ReportGeneratorTool(BaseTool):
             <div class="col-md-6 mb-4">
                 <div class="card">
                     <div class="card-header">
-                        <h5>📊 Casos Mensais (Últimos 12 meses)</h5>
+                        <h5>Casos Mensais (Últimos 12 meses)</h5>
                     </div>
                     <div class="card-body">
                         <div class="chart-info">
@@ -362,7 +362,7 @@ class ReportGeneratorTool(BaseTool):
         </div>
         """
         
-        return charts_html
+        return charts_html    
     
     def _generate_news_section(self, news_analysis: Dict[str, Any]) -> str:
         """Gera seção de análise de notícias."""
@@ -370,7 +370,7 @@ class ReportGeneratorTool(BaseTool):
             return """
             <div class="section">
                 <div class="container">
-                    <h3 class="section-title">📰 Análise de Notícias</h3>
+                    <h3 class="section-title">Análise de Notícias</h3>
                     <div class="alert alert-info">
                         Análise de notícias não disponível neste relatório.
                     </div>
@@ -385,7 +385,7 @@ class ReportGeneratorTool(BaseTool):
         news_html = f"""
         <div class="section">
             <div class="container">
-                <h3 class="section-title">📰 Análise de Notícias</h3>
+                <h3 class="section-title">Análise de Notícias</h3>
                 <div class="row">
                     <div class="col-md-8">
                         <div class="card">
@@ -423,7 +423,7 @@ class ReportGeneratorTool(BaseTool):
         data_html = f"""
         <div class="section">
             <div class="container">
-                <h3 class="section-title">📋 Resumo dos Dados</h3>
+                <h3 class="section-title">Resumo dos Dados</h3>
                 <div class="row">
                     <div class="col-md-6">
                         <div class="card">
@@ -474,6 +474,55 @@ class ReportGeneratorTool(BaseTool):
             </div>
         </div>
         """
+    
+    async def generate_executive_summary_with_gemini(
+        self,
+        metrics: Dict[str, Any],
+        news_analysis: Dict[str, Any],
+        data_summary: Dict[str, Any]
+    ) -> Dict[str, str]:
+        """
+        Gera resumo executivo aprimorado usando Google Gemini.
+        
+        Args:
+            metrics: Métricas calculadas
+            news_analysis: Análise de notícias
+            data_summary: Resumo dos dados analisados
+            
+        Returns:
+            Dict com resumo executivo e insights
+        """
+        try:
+            gemini = get_gemini_client()
+            
+            # Gerar insights consolidados
+            insights = await gemini.generate_report_insights(
+                data_summary, 
+                metrics, 
+                news_analysis
+            )
+            
+            # Gerar explicações das métricas
+            explanations = await gemini.generate_metrics_explanation(metrics)
+            
+            logger.info("Resumo executivo com Gemini gerado com sucesso")
+            
+            return {
+                'insights': insights,
+                'metrics_explanations': explanations,
+                'gemini_enhanced': True
+            }
+            
+        except Exception as e:
+            logger.warning(f"Erro ao gerar resumo com Gemini, usando fallback: {e}")
+            
+            # Fallback para resumo tradicional
+            summary = self._generate_executive_summary(metrics, news_analysis)
+            return {
+                'insights': summary,
+                'metrics_explanations': {},
+                'gemini_enhanced': False
+            }
     
     def _generate_executive_summary(
         self, 

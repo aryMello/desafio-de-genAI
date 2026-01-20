@@ -141,7 +141,7 @@ class SRAGOrchestrator(BaseAgent):
             end_date = datetime.strptime(report_date, "%Y-%m-%d")
             start_date = end_date - timedelta(days=365)
             
-            # ADICIONAR: Garantir que não busca datas futuras
+            # Garantir que não busca datas futuras
             hoje = datetime.now()
             if end_date > hoje:
                 logger.warning(f"Data do relatório ({report_date}) é futura, ajustando para hoje")
@@ -276,6 +276,7 @@ class SRAGOrchestrator(BaseAgent):
     async def _analyze_news(self, metrics: Dict[str, Any]) -> Dict[str, Any]:
         """
         Busca e analisa notícias relacionadas a SRAG para contextualizar as métricas.
+        Usa Google Gemini para análise aprimorada.
         
         Args:
             metrics: Métricas calculadas para contextualizar a busca
@@ -285,16 +286,16 @@ class SRAGOrchestrator(BaseAgent):
         """
         try:
             self._update_step("news_analysis")
-            logger.info("Iniciando análise de notícias")
+            logger.info("Iniciando análise de notícias com Gemini")
             
             # Buscar notícias relevantes
             news_articles = await self.news_tool.search_srag_news(
-                max_articles=10,
-                date_range_days=30
+                max_articles=15,
+                date_range_days=60
             )
             
-            # Analisar relevância das notícias com as métricas
-            news_analysis = await self.news_tool.analyze_news_context(
+            # Analisar com Gemini (com fallback para análise tradicional)
+            news_analysis = await self.news_tool.analyze_news_with_gemini(
                 news_articles, metrics
             )
             
@@ -302,7 +303,7 @@ class SRAGOrchestrator(BaseAgent):
             filtered_analysis = self.guardrails.filter_news_content(news_analysis)
             
             self._complete_step("news_analysis")
-            logger.info(f"Notícias analisadas: {len(news_articles)}")
+            logger.info(f"Notícias analisadas: {len(news_articles)} com Gemini")
             
             return filtered_analysis
             

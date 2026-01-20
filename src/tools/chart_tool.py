@@ -189,7 +189,7 @@ class ChartGeneratorTool(BaseTool):
             # Agrupar por ano e mês
             monthly_cases = period_data.groupby(['ano', 'mes']).size().reset_index(name='casos')
             
-            # Criar coluna de data (primeiro dia de cada mês) - CORRIGIDO
+            # Criar coluna de data (primeiro dia de cada mês)
             monthly_cases['data'] = pd.to_datetime(
                 monthly_cases['ano'].astype(str) + '-' + 
                 monthly_cases['mes'].astype(str).str.zfill(2) + '-01'

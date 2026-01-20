@@ -152,7 +152,7 @@ class DatabaseTool(BaseTool):
             # Ler apenas o header para verificar colunas
             sample = pd.read_csv(
                 self.data_path,
-                encoding='utf-8',  # <-- MUDOU AQUI
+                encoding='utf-8',
                 sep=';',
                 nrows=0
             )
@@ -189,11 +189,11 @@ class DatabaseTool(BaseTool):
             DataFrame processado
         """
         try:
-            # Converter datas - CORRIGIDO PARA FORMATO ISO
+            # Converter datas
             if 'DT_NOTIFIC' in chunk.columns:
                 chunk['DT_NOTIFIC'] = pd.to_datetime(
                     chunk['DT_NOTIFIC'], 
-                    format='%Y-%m-%d',  # <-- MUDOU AQUI
+                    format='%Y-%m-%d',
                     errors='coerce'
                 )
                 
@@ -318,7 +318,7 @@ class DatabaseTool(BaseTool):
                 )
             
             # Campo de evolução simplificada
-            # CORRIGIDO: Aceitar string ou numérico
+            # Aceitar string ou numérico
             if 'EVOLUCAO' in data.columns:
                 # Converter para string para comparação
                 evolucao_str = data['EVOLUCAO'].astype(str).str.strip()
@@ -331,14 +331,14 @@ class DatabaseTool(BaseTool):
                 logger.info(f"Distribuição EVOLUCAO_SIMPLES: {data['EVOLUCAO_SIMPLES'].value_counts().to_dict()}")
             
             # Campo de gravidade baseado em UTI e suporte ventilatório
-            # CORRIGIDO: Aceitar tanto 1 quanto '1'
+            # Aceitar tanto 1 quanto '1'
             if 'UTI' in data.columns:
                 uti_values = pd.to_numeric(data['UTI'], errors='coerce')
                 data['CASO_GRAVE'] = (uti_values == 1).astype(int)
                 logger.info(f"Casos graves (UTI=1): {data['CASO_GRAVE'].sum()}")
             
             # Campo de status vacinal consolidado
-            # CORRIGIDO: Verificar múltiplos valores possíveis
+            # Verificar múltiplos valores possíveis
             if 'VACINA_COV' in data.columns or any(col in data.columns for col in ['DOSE_1_COV', 'DOSE_2_COV']):
                 data['STATUS_VACINAL'] = 'Não informado'
                 
@@ -403,14 +403,12 @@ class DatabaseTool(BaseTool):
                 data.loc[data['NU_IDADE_N'] < 2, 'GRUPO_RISCO_IDADE'] = 'Alto'
             
             # Classificação de evolução
-            # CORRIGIDO: Aceitar string ou numérico
             if 'EVOLUCAO' in data.columns:
                 evolucao_str = data['EVOLUCAO'].astype(str).str.strip()
                 data['TEVE_OBITO'] = evolucao_str.isin(['2', '3']).astype(int)
                 logger.info(f"Total de óbitos identificados: {data['TEVE_OBITO'].sum()}")
             
             # Classificação de internação
-            # CORRIGIDO: Aceitar tanto 1 quanto '1'
             if 'UTI' in data.columns:
                 uti_numeric = pd.to_numeric(data['UTI'], errors='coerce')
                 data['TEVE_UTI'] = (uti_numeric == 1).astype(int)

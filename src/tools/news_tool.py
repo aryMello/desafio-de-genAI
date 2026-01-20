@@ -10,6 +10,7 @@ import re
 from .base_tool import BaseTool
 from ..utils.logger import get_logger
 from ..utils.config import Config
+from ..utils.llm_gemini import get_gemini_client
 
 logger = get_logger(__name__)
 
@@ -30,17 +31,33 @@ class NewsSearchTool(BaseTool):
             'https://g1.globo.com/rss/g1/ciencia-e-saude/',
             'https://www1.folha.uol.com.br/rss/cotidiano.xml',
             'https://saude.estadao.com.br/rss.xml',
-            'https://agencia.fiocruz.br/rss.xml'
+            'https://agencia.fiocruz.br/rss.xml',
+            'https://portal.fiocruz.br/rss.xml',
+            'https://www.gov.br/saude/pt-br/assuntos/noticias/rss.xml',
+            'https://www.anvisa.gov.br/institucional/rss/noticias.xml',
+            'https://www.butantan.gov.br/noticias/rss.xml'
         ]
         
-        # Termos de busca relacionados a SRAG - EXPANDIDOS
+        # Termos de busca relacionados a SRAG 
         self.search_terms = [
-            'SRAG', 'Síndrome Respiratória Aguda Grave',
-            'síndrome respiratória', 'internação respiratória',
-            'UTI respiratório', 'casos respiratórios',
-            'surto respiratório', 'epidemia respiratória',
-            'gripe', 'influenza', 'covid', 'pneumonia',  # Termos adicionais
-            'vírus respiratório', 'doença respiratória'
+            'SRAG',
+            'Síndrome Respiratória Aguda Grave',
+            'síndrome respiratória',
+            'internação respiratória',
+            'UTI respiratório',
+            'casos respiratórios',
+            'surto respiratório',
+            'epidemia respiratória',
+            'vigilância epidemiológica',
+            'notificação compulsória',
+            'doença respiratória grave',
+            'doença respiratória aguda',
+            'vírus respiratório',
+            'infecção respiratória',
+            'pandemia respiratória',
+            'crise respiratória',
+            'emergência respiratória',
+            'saúde respiratória'
         ]
         
         # Cache de notícias
@@ -148,7 +165,7 @@ class NewsSearchTool(BaseTool):
                         except Exception as e:
                             logger.debug(f"Erro ao parsear data: {e}")
                     
-                    # MUDANÇA: Aceitar artigos sem data OU dentro do range
+                    # Aceita artigos sem data OU dentro do range
                     if pub_date and pub_date < cutoff_date:
                         logger.debug(f"Artigo muito antigo: {entry.get('title', '')[:50]}")
                         continue
@@ -158,7 +175,7 @@ class NewsSearchTool(BaseTool):
                     summary = entry.get('summary', '').lower()
                     content = f"{title} {summary}"
                     
-                    # MUDANÇA: Log de verificação de termos
+                    # Log de verificação de termos
                     matching_terms = [term for term in self.search_terms if term.lower() in content]
                     
                     if matching_terms:
@@ -261,7 +278,6 @@ class NewsSearchTool(BaseTool):
         """
         relevant_articles = []
         
-        # MUDANÇA: Palavras-chave expandidas e menos restritivas
         relevant_keywords = [
             'srag', 'respiratória', 'respiratorio', 'respiratória', 'respiratório',
             'uti', 'internação', 'internacao', 'hospital', 'casos', 'surto', 'epidemia',
@@ -288,7 +304,6 @@ class NewsSearchTool(BaseTool):
                 if keyword in text_content
             )
             
-            # MUDANÇA: Reduzir threshold de 2 para 1
             if relevance_score >= 1:
                 article['relevance_score'] = relevance_score
                 relevant_articles.append(article)
@@ -388,7 +403,7 @@ class NewsSearchTool(BaseTool):
         
         # Gerar resumo detalhado
         summary_parts = [
-            f"<h3>📊 Panorama Geral</h3>",
+            f"<h3>Panorama Geral</h3>",
             f"<p>Foram analisadas {len(articles)} notícias relevantes sobre SRAG e doenças respiratórias no período. "
         ]
         
@@ -410,7 +425,7 @@ class NewsSearchTool(BaseTool):
         
         # Análise detalhada por tema
         if themes['increase']['count'] > 0:
-            summary_parts.append(f"<h4>📈 Aumento de Casos</h4>")
+            summary_parts.append(f"<h4>Aumento de Casos</h4>")
             summary_parts.append(f"<p>{themes['increase']['count']} {'notícia menciona' if themes['increase']['count'] == 1 else 'notícias mencionam'} aumento nos casos respiratórios. ")
             
             # Relacionar com métricas
@@ -426,7 +441,7 @@ class NewsSearchTool(BaseTool):
             summary_parts.append("</ul></p>")
         
         if themes['hospitalization']['count'] > 0:
-            summary_parts.append(f"<h4>🏥 Internações e Hospitalização</h4>")
+            summary_parts.append(f"<h4>Internações e Hospitalização</h4>")
             summary_parts.append(f"<p>{themes['hospitalization']['count']} {'notícia aborda' if themes['hospitalization']['count'] == 1 else 'notícias abordam'} questões relacionadas a internações e ocupação hospitalar. ")
             
             # Relacionar com métricas UTI
@@ -442,7 +457,7 @@ class NewsSearchTool(BaseTool):
             summary_parts.append("</ul>")
         
         if themes['deaths']['count'] > 0:
-            summary_parts.append(f"<h4>⚠️ Mortalidade</h4>")
+            summary_parts.append(f"<h4>Mortalidade</h4>")
             summary_parts.append(f"<p>{themes['deaths']['count']} {'notícia menciona' if themes['deaths']['count'] == 1 else 'notícias mencionam'} questões de mortalidade. ")
             
             if 'mortality_rate' in metrics:
@@ -460,7 +475,7 @@ class NewsSearchTool(BaseTool):
             summary_parts.append("</ul>")
         
         if themes['vaccination']['count'] > 0:
-            summary_parts.append(f"<h4>💉 Vacinação</h4>")
+            summary_parts.append(f"<h4>Vacinação</h4>")
             summary_parts.append(f"<p>{themes['vaccination']['count']} {'notícia aborda' if themes['vaccination']['count'] == 1 else 'notícias abordam'} campanhas de vacinação e imunização. ")
             
             if 'vaccination_rate' in metrics:
@@ -474,11 +489,11 @@ class NewsSearchTool(BaseTool):
             summary_parts.append("</ul>")
         
         if themes['alert']['count'] > 0:
-            summary_parts.append(f"<h4>🔔 Alertas e Recomendações</h4>")
+            summary_parts.append(f"<h4>Alertas e Recomendações</h4>")
             summary_parts.append(f"<p>{themes['alert']['count']} {'notícia contém' if themes['alert']['count'] == 1 else 'notícias contêm'} alertas ou recomendações de autoridades de saúde.</p>")
         
         # Considerações finais
-        summary_parts.append("<h4>💡 Considerações</h4>")
+        summary_parts.append("<h4>Considerações</h4>")
         summary_parts.append("<p>")
         
         if themes['increase']['count'] > 0 and 'case_increase_rate' in metrics:
@@ -495,7 +510,7 @@ class NewsSearchTool(BaseTool):
         summary_parts.append("</p>")
         
         # Lista completa de fontes
-        summary_parts.append("<h4>📰 Todas as Notícias Analisadas</h4>")
+        summary_parts.append("<h4>Todas as Notícias Analisadas</h4>")
         summary_parts.append("<ol>")
         for article in articles:
             title = article.get('title', 'Sem título')
@@ -642,6 +657,105 @@ class NewsSearchTool(BaseTool):
             
             sources_count[source] = sources_count.get(source, 0) + 1
         return sources_count
+    
+    async def analyze_news_with_gemini(
+        self, 
+        articles: List[Dict[str, Any]], 
+        metrics: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Realiza análise avançada das notícias usando Google Gemini.
+        
+        Args:
+            articles: Lista de artigos de notícias
+            metrics: Dict com métricas calculadas
+            
+        Returns:
+            Dict com análise aprimorada via Gemini
+        """
+        execution_id = self.log_execution_start("analyze_news_with_gemini", {
+            'articles_count': len(articles),
+            'metrics_available': list(metrics.keys())
+        })
+        
+        start_time = datetime.now()
+        
+        try:
+            if not articles:
+                return {
+                    'gemini_analysis': 'Nenhuma notícia relevante encontrada para análise',
+                    'articles': [],
+                    'analysis_type': 'gemini',
+                    'fallback': False
+                }
+            
+            # Obter cliente Gemini
+            gemini = get_gemini_client()
+            
+            # Gerar análise com Gemini
+            gemini_analysis = await gemini.generate_news_analysis(articles, metrics)
+            
+            # Adicionar metadados úteis aos artigos (análise local)
+            enriched_articles = []
+            for article in articles:
+                enriched = article.copy()
+                
+                # Identificar temas do artigo
+                content = f"{article.get('title', '')} {article.get('summary', '')}".lower()
+                themes = []
+                
+                if any(word in content for word in ['aumento', 'alta', 'crescimento', 'dispara']):
+                    themes.append('Aumento de casos')
+                if any(word in content for word in ['óbito', 'morte', 'mortalidade']):
+                    themes.append('Mortalidade')
+                if any(word in content for word in ['uti', 'internação', 'hospital']):
+                    themes.append('Hospitalização')
+                if any(word in content for word in ['vacina', 'vacinação', 'imunização']):
+                    themes.append('Vacinação')
+                if any(word in content for word in ['alerta', 'preocupa', 'risco']):
+                    themes.append('Alerta')
+                if any(word in content for word in ['prevenção', 'cuidados', 'proteção']):
+                    themes.append('Prevenção')
+                
+                enriched['identified_themes'] = themes
+                enriched_articles.append(enriched)
+            
+            analysis = {
+                'gemini_analysis': gemini_analysis,
+                'articles': enriched_articles,
+                'analysis_type': 'gemini',
+                'analysis_timestamp': datetime.now().isoformat(),
+                'total_articles_analyzed': len(articles),
+                'themes_breakdown': self._get_themes_breakdown(enriched_articles),
+                'sources_breakdown': self._get_sources_breakdown(articles),
+                'fallback': False
+            }
+            
+            execution_time = (datetime.now() - start_time).total_seconds()
+            
+            self.log_execution_end(
+                execution_id, 
+                True, 
+                execution_time,
+                f"Análise Gemini concluída para {len(articles)} artigos"
+            )
+            
+            return analysis
+            
+        except Exception as e:
+            execution_time = (datetime.now() - start_time).total_seconds()
+            
+            logger.warning(f"Erro na análise com Gemini, usando fallback: {e}")
+            
+            self.log_execution_end(
+                execution_id, 
+                False, 
+                execution_time,
+                error=str(e)
+            )
+            
+            # Fallback para análise tradicional
+            return await self.analyze_news_context(articles, metrics)
     
     def health_check(self) -> Dict[str, Any]:
         """Verifica saúde da ferramenta de notícias."""

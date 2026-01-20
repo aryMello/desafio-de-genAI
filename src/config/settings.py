@@ -26,7 +26,7 @@ class DatabaseSettings:
     chunk_size: int = 10000
     cache_ttl: int = 3600  # 1 hora em segundos
     max_memory_usage_mb: int = 2048
-    encoding: str = "latin-1"
+    encoding: str = "utf-8"
     separator: str = ";"
     
     # Colunas essenciais do DataSUS SRAG
@@ -81,8 +81,8 @@ class DatabaseSettings:
 @dataclass
 class NewsSettings:
     """Configurações de busca de notícias."""
-    max_articles: int = 10
-    search_days: int = 30
+    max_articles: int = 15
+    search_days: int = 45
     cache_ttl: int = 1800  # 30 minutos
     timeout_seconds: int = 30
     max_retry_attempts: int = 3
@@ -93,7 +93,10 @@ class NewsSettings:
         'https://www1.folha.uol.com.br/rss/cotidiano.xml',
         'https://saude.estadao.com.br/rss.xml',
         'https://agencia.fiocruz.br/rss.xml',
-        'https://portal.fiocruz.br/rss.xml'
+        'https://portal.fiocruz.br/rss.xml',
+        'https://www.gov.br/saude/pt-br/assuntos/noticias/rss.xml',
+        'https://www.anvisa.gov.br/institucional/rss/noticias.xml',
+        'https://www.butantan.gov.br/noticias/rss.xml'
     ])
     
     # Termos de busca para SRAG
@@ -107,7 +110,15 @@ class NewsSettings:
         'surto respiratório',
         'epidemia respiratória',
         'vigilância epidemiológica',
-        'notificação compulsória'
+        'notificação compulsória',
+        'doença respiratória grave',
+        'doença respiratória aguda',
+        'vírus respiratório',
+        'infecção respiratória',
+        'pandemia respiratória',
+        'crise respiratória',
+        'emergência respiratória',
+        'saúde respiratória'
     ])
     
     # Fontes confiáveis para filtro
@@ -219,7 +230,8 @@ class SecuritySettings:
         'desinformação',
         'hoax',
         'golpe',
-        'farsa'
+        'farsa',
+        'mentira'
     ])
 
 @dataclass  
@@ -228,7 +240,7 @@ class SystemSettings:
     
     # Informações da aplicação
     app_name: str = "Sistema de Relatórios SRAG"
-    app_version: str = "1.0.0"
+    app_version: str = "2.0.0"
     organization: str = "ABC HealthCare Inc."
     
     # Configurações de performance

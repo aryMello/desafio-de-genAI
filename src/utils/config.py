@@ -18,8 +18,13 @@ class Config:
             'DATA_PATH': os.getenv('DATA_PATH', 'data/raw/srag_data.csv'),
             
             # APIs
-            'OPENAI_API_KEY': os.getenv('OPENAI_API_KEY'),
+            'GEMINI_API_KEY': os.getenv('GEMINI_API_KEY'),
             'NEWS_API_KEY': os.getenv('NEWS_API_KEY'),
+            
+            # Gemini Configuration
+            'GEMINI_MODEL': os.getenv('GEMINI_MODEL', 'gemini-2.5-pro'),
+            'GEMINI_TEMPERATURE': float(os.getenv('GEMINI_TEMPERATURE', '0.7')),
+            'GEMINI_MAX_TOKENS': int(os.getenv('GEMINI_MAX_TOKENS', '2048')),
             
             # Logs
             'LOG_LEVEL': os.getenv('LOG_LEVEL', 'INFO'),
@@ -42,9 +47,9 @@ class Config:
         """Verifica se configurações essenciais estão presentes."""
         status = {'status': 'healthy', 'issues': []}
         
-        # Verificar chave da OpenAI
-        if not self._config.get('OPENAI_API_KEY'):
-            status['issues'].append('OPENAI_API_KEY não configurada')
+        # Verificar chave do Gemini
+        if not self._config.get('GEMINI_API_KEY'):
+            status['issues'].append('GEMINI_API_KEY não configurada')
             status['status'] = 'warning'
         
         # Verificar caminho dos dados
@@ -59,8 +64,9 @@ class Config:
         """Retorna resumo das configurações (sem dados sensíveis)."""
         return {
             'data_path_exists': os.path.exists(self._config.get('DATA_PATH', '')),
-            'openai_configured': bool(self._config.get('OPENAI_API_KEY')),
+            'gemini_configured': bool(self._config.get('GEMINI_API_KEY')),
             'news_api_configured': bool(self._config.get('NEWS_API_KEY')),
+            'gemini_model': self._config.get('GEMINI_MODEL'),
             'log_level': self._config.get('LOG_LEVEL'),
             'cache_ttl': self._config.get('CACHE_TTL'),
         }
